@@ -466,6 +466,8 @@ extension Defaults.Keys {
     static let pomodoroAutoStartNext = Key<Bool>("pomodoroAutoStartNext", default: true)
     static let pomodoroSound = Key<Bool>("pomodoroSound", default: true)
     static let pomodoroClosedNotchTimer = Key<Bool>("pomodoroClosedNotchTimer", default: true)
+    /// Reminders widget (extensions/RemindersWidget.swift): include reminders with no due date.
+    static let remindersShowUndated = Key<Bool>("remindersShowUndated", default: true)
     static let sliderColor = Key<SliderColorEnum>(
         "sliderUseAlbumArtColor",
         default: SliderColorEnum.white

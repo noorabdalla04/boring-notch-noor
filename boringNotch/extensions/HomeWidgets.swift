@@ -3,7 +3,7 @@
 //  boringNotch
 //
 //  Noor custom: the right-hand side of the open notch is a small pager of
-//  widgets -- Calendar, Prayers, Pomodoro -- in that order. It opens on
+//  widgets -- Calendar, Reminders, Prayers, Pomodoro -- in that order. It opens on
 //  Calendar; a horizontal two-finger swipe (or a click on the dots) moves
 //  between pages.
 //
@@ -16,7 +16,7 @@
 //
 //  Pulling the notch down expands it to 640 x 430: the music player stays where
 //  it is, the Pomodoro and Prayers cards fill the space under it, and the
-//  calendar runs the full height on the right. Pull down by dragging the strip
+//  calendar (or reminders -- two dots switch them) runs the full height on the right. Pull down by dragging the strip
 //  along the bottom edge, clicking it, or two-finger scrolling down outside the
 //  calendar; fold it back the same ways (or close the notch).
 //
@@ -26,13 +26,18 @@ import Defaults
 import SwiftUI
 
 enum HomeWidgetPage: Int, CaseIterable, Identifiable {
-    case calendar, prayers, pomodoro
+    case calendar, reminders, prayers, pomodoro
 
     var id: Int { rawValue }
+
+    /// The pages offered in the pulled-down notch's right column; Prayers and
+    /// Pomodoro are already on the left there.
+    static let expandedPages: [HomeWidgetPage] = [.calendar, .reminders]
 
     var title: String {
         switch self {
         case .calendar: "Calendar"
+        case .reminders: "Reminders"
         case .prayers: "Prayers"
         case .pomodoro: "Pomodoro"
         }
@@ -66,8 +71,10 @@ final class HomeWidgetState: ObservableObject {
         }
     }
 
-    func move(by delta: Int) {
-        if let target = HomeWidgetPage(rawValue: page.rawValue + delta) { go(to: target) }
+    func move(by delta: Int, within pages: [HomeWidgetPage] = HomeWidgetPage.allCases) {
+        let index = pages.firstIndex(of: page) ?? 0
+        let next = index + delta
+        if pages.indices.contains(next) { go(to: pages[next]) }
     }
 }
 
@@ -94,9 +101,26 @@ struct HomeWidgetPager: View {
         VStack(spacing: 3) {
             if vm.isWidgetExpanded {
                 // Expanded: Pomodoro and Prayers live under the music player,
-                // so this column is the calendar, full height.
-                CalendarView().environmentObject(vm)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                // so this column is the calendar or the reminders, full height.
+                let page: HomeWidgetPage = state.page == .reminders ? .reminders : .calendar
+                ZStack {
+                    Group {
+                        if page == .reminders {
+                            RemindersPageView(roomy: true).environmentObject(vm)
+                        } else {
+                            CalendarView().environmentObject(vm)
+                        }
+                    }
+                    .id(page)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: state.forward ? .trailing : .leading).combined(with: .opacity),
+                        removal: .move(edge: state.forward ? .leading : .trailing).combined(with: .opacity)
+                    ))
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipped()
+
+                PageDots(pages: HomeWidgetPage.expandedPages, page: page) { state.go(to: $0) }
             } else {
                 ZStack {
                     pageContent(state.page)
@@ -109,7 +133,7 @@ struct HomeWidgetPager: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
 
-                PageDots(page: state.page) { state.go(to: $0) }
+                PageDots(pages: HomeWidgetPage.allCases, page: state.page) { state.go(to: $0) }
             }
         }
         .contentShape(Rectangle())
@@ -130,6 +154,8 @@ struct HomeWidgetPager: View {
         switch page {
         case .calendar:
             CalendarView().environmentObject(vm)
+        case .reminders:
+            RemindersPageView().environmentObject(vm)
         case .prayers:
             PrayerTimesPageView()
         case .pomodoro:
@@ -143,7 +169,8 @@ struct HomeWidgetPager: View {
         guard monitor == nil else { return }
         let swipe = swipe
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
-            guard isHovering, !vm.isWidgetExpanded else { return event }
+            guard isHovering else { return event }
+            let pages = vm.isWidgetExpanded ? HomeWidgetPage.expandedPages : HomeWidgetPage.allCases
 
             let now = Date()
             // A new trackpad gesture, or a mouse wheel after a pause, starts fresh.
@@ -168,10 +195,10 @@ struct HomeWidgetPager: View {
 
             if swipe.accumulated <= -threshold {
                 swipe.fired = true
-                state.move(by: 1)        // fingers moved left: next page
+                state.move(by: 1, within: pages)        // fingers moved left: next page
             } else if swipe.accumulated >= threshold {
                 swipe.fired = true
-                state.move(by: -1)       // fingers moved right: previous page
+                state.move(by: -1, within: pages)       // fingers moved right: previous page
             }
             return nil
         }
@@ -184,12 +211,13 @@ struct HomeWidgetPager: View {
 }
 
 private struct PageDots: View {
+    let pages: [HomeWidgetPage]
     let page: HomeWidgetPage
     let select: (HomeWidgetPage) -> Void
 
     var body: some View {
         HStack(spacing: 5) {
-            ForEach(HomeWidgetPage.allCases) { item in
+            ForEach(pages) { item in
                 Button { select(item) } label: {
                     Capsule()
                         .fill(item == page ? Color.white.opacity(0.85) : Color.white.opacity(0.25))
@@ -255,7 +283,7 @@ extension BoringViewModel {
     /// the pointer must not close it: the pointer is usually below the notch
     /// when a pull-down ends.
     var holdsOpenForWidget: Bool {
-        isDraggingWidget || Date() < widgetHoldUntil
+        isDraggingWidget || isTypingInWidget || Date() < widgetHoldUntil
     }
 
     /// Make the window tall before anything grows into it. Called when the

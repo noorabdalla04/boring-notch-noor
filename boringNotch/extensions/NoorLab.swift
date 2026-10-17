@@ -21,6 +21,10 @@
 //    release X Y
 //    move X Y                       pointer moves there (drives hover)
 //    wait MS
+//    reminders                      log reminder counts per section (no titles)
+//    tick N                         tick the Nth listed reminder (simulated, never saved)
+//    add TEXT                       add a reminder through the page (simulated)
+//    type TEXT | key return|escape  keyboard into the focused field
 //
 //  Each command appends "ok <command>" (and `state` a JSON line) to lab.log in
 //  the container's tmp/noor-lab/; window-id there holds the window number for
@@ -52,7 +56,7 @@ enum NoorLab {
         // No screen is attached to the lab's view model, so nothing would ever
         // un-hide the closed notch; show it like the real notch does.
         vm.hideOnClosed = false
-        let panel = NSPanel(
+        let panel = LabPanel(
             contentRect: NSRect(origin: .zero, size: expandedWindowSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: false
@@ -129,11 +133,23 @@ enum NoorLab {
             await drag(from: CGPoint(x: n[0], y: n[1]), to: CGPoint(x: n[2], y: n[3]), steps: 12, release: false, in: window)
         case "move" where n.count >= 2:
             await mouse(.mouseMoved, at: CGPoint(x: n[0], y: n[1]), in: window)
+        case "type":
+            await type(parts.dropFirst().joined(separator: " "), in: window)
+        case "key" where parts.count >= 2:
+            await key(parts[1], in: window)
         case "release" where n.count >= 2:
             await mouse(.leftMouseUp, at: CGPoint(x: n[0], y: n[1]), in: window)
         case "scroll" where n.count >= 3:
             await scroll(at: CGPoint(x: n[0], y: n[1]), dy: n[2], steps: Int(n.count > 3 ? n[3] : 10), in: window)
         case "state": log("state " + state(vm))
+        case "reminders": log("reminders " + RemindersManager.shared.stats())
+        case "tick" where n.count >= 1:
+            // Tick the Nth reminder as listed (simulated in the lab: nothing is saved).
+            let flat = RemindersManager.shared.sections().flatMap { $0.1 }
+            if flat.indices.contains(Int(n[0])) { RemindersManager.shared.toggle(flat[Int(n[0])]) }
+        case "add":
+            let text = parts.dropFirst().joined(separator: " ")
+            NotificationCenter.default.post(name: .noorLabAddReminder, object: text)
         case "quit": NSApp.terminate(nil)
         default: log("unknown \(command)")
         }
@@ -165,6 +181,33 @@ enum NoorLab {
             await mouse(.leftMouseDragged, at: CGPoint(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t), in: window)
         }
         if release { await mouse(.leftMouseUp, at: b, in: window) }
+    }
+
+    /// Typed text, one key event per character, to whatever has focus in the lab window.
+    private static func type(_ text: String, in window: NSWindow) async {
+        for character in text {
+            for type in [NSEvent.EventType.keyDown, .keyUp] {
+                if let event = NSEvent.keyEvent(
+                    with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                    windowNumber: window.windowNumber, context: nil, characters: String(character),
+                    charactersIgnoringModifiers: String(character), isARepeat: false, keyCode: 0
+                ) { NSApp.postEvent(event, atStart: false) }
+            }
+            try? await Task.sleep(for: .milliseconds(12))
+        }
+    }
+
+    /// return | escape
+    private static func key(_ name: String, in window: NSWindow) async {
+        let (chars, code): (String, UInt16) = name == "escape" ? ("\u{1B}", 53) : ("\r", 36)
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            if let event = NSEvent.keyEvent(
+                with: type, location: .zero, modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, characters: chars,
+                charactersIgnoringModifiers: chars, isARepeat: false, keyCode: code
+            ) { NSApp.postEvent(event, atStart: false) }
+        }
+        try? await Task.sleep(for: .milliseconds(30))
     }
 
     /// A trackpad-style scroll: began, changed..., ended, aimed at the lab window.
@@ -210,4 +253,10 @@ enum NoorLab {
         handle.write(Data((line + "\n").utf8))
         try? handle.close()
     }
+}
+
+/// The lab's window: like the notch panel, it can take the keyboard (the
+/// notch only does while a widget text field is in use).
+private final class LabPanel: NSPanel {
+    override var canBecomeKey: Bool { true }
 }

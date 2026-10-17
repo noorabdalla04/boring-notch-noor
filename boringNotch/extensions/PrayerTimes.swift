@@ -288,7 +288,7 @@ struct PrayerCardView: View {
                 VStack(spacing: 1) {
                     HStack(spacing: 4) {
                         Spacer()
-                        Text("iqama").frame(width: 34, alignment: .trailing)
+                        Text("iqama").frame(width: 30, alignment: .trailing)
                         Text("adhan").frame(width: 38, alignment: .trailing)
                     }
                     .font(.system(size: 8.5, weight: .medium))
@@ -310,13 +310,14 @@ struct PrayerCardView: View {
         return HStack(spacing: 4) {
             Text(prayer.name)
                 .font(.system(size: 11.5, weight: isNext || isCurrent ? .semibold : .regular))
+                .fixedSize()
             if isCurrent { Circle().fill(Color.effectiveAccent).frame(width: 4, height: 4) }
-            Spacer(minLength: 2)
+            Spacer(minLength: 0)
             Text(prayer.iqama.map(Self.short) ?? "")
                 .font(.system(size: 10))
                 .monospacedDigit()
                 .foregroundStyle(.gray)
-                .frame(width: 34, alignment: .trailing)
+                .frame(width: 30, alignment: .trailing)
                 .help(prayer.iqama == nil ? "" : "Iqama\(prayer.place.map { " at \($0)" } ?? "")")
             Text(Self.short(prayer.time))
                 .font(.system(size: 11.5, weight: isNext ? .semibold : .regular))

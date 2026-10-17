@@ -18,7 +18,7 @@ for command in CommandLine.arguments.dropFirst() {
     while Date() < deadline {
         let now = lines()
         if now.count > start, now[start...].contains("ok \(command)") {
-            for line in now[start...] where line.hasPrefix("state ") || line.hasPrefix("unknown") {
+            for line in now[start...] where line.hasPrefix("state ") || line.hasPrefix("reminders ") || line.hasPrefix("unknown") {
                 print(line)
             }
             done = true

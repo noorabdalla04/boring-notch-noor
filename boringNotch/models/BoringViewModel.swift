@@ -35,6 +35,8 @@ final class BoringViewModel: NSObject, ObservableObject {
     @Published var isDraggingWidget: Bool = false
     /// Hover-exit doesn't close the notch until this moment (just after a pull).
     var widgetHoldUntil: Date = .distantPast
+    /// A widget text field (new reminder) has the keyboard.
+    @Published var isTypingInWidget: Bool = false
     /// Keeps the open notch alive while a popover is showing.
     @Published var isPopoverActive: Bool = false
 
@@ -211,6 +213,7 @@ final class BoringViewModel: NSObject, ObservableObject {
         self.widgetDragOffset = 0
         self.widgetWindowTall = false
         self.isDraggingWidget = false
+        self.isTypingInWidget = false
         if self.coordinator.shouldShowSneakPeek(on: self.screenUUID) {
             self.coordinator.toggleSneakPeek(status: false, type: .music, targetScreenUUID: self.screenUUID)
         }

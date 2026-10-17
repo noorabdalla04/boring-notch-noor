@@ -79,6 +79,16 @@ struct CalendarSettings: View {
 
             PomodoroSettingsSection()
 
+            Section {
+                Defaults.Toggle(key: .remindersShowUndated) {
+                    Text("Show reminders with no due date")
+                }
+            } header: {
+                Text("Reminders widget")
+            } footer: {
+                Text("The Reminders page shows incomplete reminders from the lists ticked under Reminders below: late, today, the next 7 days, and (optionally) undated.")
+            }
+
             Section(header: Text("Calendars")) {
                 if calendarManager.calendarAuthorizationStatus != .fullAccess {
                     PermissionDeniedNotice(
