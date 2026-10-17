@@ -60,6 +60,23 @@ struct CalendarSettings: View {
                 Text("Events")
             }
 
+            Section {
+                Defaults.Toggle(key: .taskBlockCheckboxes) {
+                    Text("Checkboxes on FlowSavvy & FlowLocal blocks")
+                }
+                FlowSavvyKeyField()
+                HStack {
+                    Text("FlowLocal")
+                    Spacer()
+                    Text(FlowLocalKey.read() != nil ? "Connected (key found)" : "Not set up on this Mac")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Task blocks")
+            } footer: {
+                Text("Ticking a block marks that sitting done: its time counts toward the task and the rest re-plans. Ticking a task's only or last block completes it.")
+            }
+
             Section(header: Text("Calendars")) {
                 if calendarManager.calendarAuthorizationStatus != .fullAccess {
                     PermissionDeniedNotice(
@@ -187,4 +204,31 @@ func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
     let nb = lighten(b)
 
     return Color(red: Double(nr), green: Double(ng), blue: Double(nb), opacity: Double(a))
+}
+
+/// FlowSavvy API key, kept in the Keychain. The field never shows the saved key.
+private struct FlowSavvyKeyField: View {
+    @State private var draft = ""
+    @State private var isSaved = FlowSavvyKeychain.read() != nil
+
+    var body: some View {
+        HStack {
+            SecureField(
+                "FlowSavvy API key",
+                text: $draft,
+                prompt: Text(isSaved ? "Saved — paste a new one to replace" : "FlowSavvy → Settings → API")
+            )
+            Button("Save") {
+                isSaved = FlowSavvyKeychain.save(draft)
+                draft = ""
+            }
+            .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            if isSaved {
+                Button("Remove") {
+                    FlowSavvyKeychain.delete()
+                    isSaved = false
+                }
+            }
+        }
+    }
 }

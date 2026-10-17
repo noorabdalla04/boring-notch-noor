@@ -452,6 +452,8 @@ extension Defaults.Keys {
     static let tileShowLabels = Key<Bool>("tileShowLabels", default: false)
     static let showCalendar = Key<Bool>("showCalendar", default: false)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
+    /// Checkboxes on FlowSavvy / FlowLocal task blocks (TaskBlocks.swift).
+    static let taskBlockCheckboxes = Key<Bool>("taskBlockCheckboxes", default: true)
     static let sliderColor = Key<SliderColorEnum>(
         "sliderUseAlbumArtColor",
         default: SliderColorEnum.white

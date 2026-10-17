@@ -585,6 +585,8 @@ struct EventListView: View {
     let events: [EventModel]
     @Default(.autoScrollToNextEvent) private var autoScrollToNextEvent
     @Default(.showFullEventTitles) private var showFullEventTitles
+    @Default(.taskBlockCheckboxes) private var taskBlockCheckboxes
+    @ObservedObject private var taskCompleter = TaskBlockCompleter.shared
     @State private var hoveredEventID: String?
 
     static func filteredEvents(events: [EventModel]) -> [EventModel] {
@@ -603,7 +605,7 @@ struct EventListView: View {
     }
 
     private var filteredEvents: [EventModel] {
-        Self.filteredEvents(events: events)
+        Self.filteredEvents(events: events).filter { !taskCompleter.isHidden($0) }
     }
 
     private func scrollToRelevantEvent(proxy: ScrollViewProxy) {
@@ -672,9 +674,11 @@ struct EventListView: View {
             .background(Color.clear)
             .onAppear {
                 scrollToRelevantEvent(proxy: proxy)
+                if taskBlockCheckboxes { taskCompleter.prefetch(for: events) }
             }
             .onChange(of: filteredEvents) { _, _ in
                 scrollToRelevantEvent(proxy: proxy)
+                if taskBlockCheckboxes { taskCompleter.prefetch(for: events) }
             }
         }
         Spacer(minLength: 0)
@@ -736,6 +740,18 @@ struct EventListView: View {
         } else {
             return AnyView(
                 HStack(alignment: .top, spacing: 4) {
+                    if taskBlockCheckboxes, taskCompleter.showsCheckbox(event), let block = event.taskBlock {
+                        TaskBlockCheckbox(
+                            isPending: taskCompleter.isPending(event),
+                            hasFailed: taskCompleter.failureMessage(for: event) != nil,
+                            color: Color(event.calendar.color),
+                            help: "Mark this \(block.backend.displayName) block done"
+                        ) {
+                            taskCompleter.tick(event)
+                        }
+                        .padding(.top, 2)
+                        .padding(.trailing, 2)
+                    }
                     Rectangle()
                         .fill(Color(event.calendar.color))
                         .frame(width: 3)
@@ -753,6 +769,12 @@ struct EventListView: View {
                                 .font(.caption)
                                 .foregroundColor(Color(white: 0.65))
                                 .lineLimit(1)
+                        }
+                        if let message = taskCompleter.failureMessage(for: event) {
+                            Text(message)
+                                .font(.caption2)
+                                .foregroundColor(.red.opacity(0.85))
+                                .lineLimit(2)
                         }
                     }
                     Spacer(minLength: 0)
@@ -829,6 +851,39 @@ struct ReminderToggle: View {
         .buttonStyle(PlainButtonStyle())
         .padding(0)
         .accessibilityLabel(isOn ? "Mark as incomplete" : "Mark as complete")
+    }
+}
+
+/// The checkbox on a FlowSavvy / FlowLocal block. Same look as ReminderToggle, plus a
+/// spinner while the scheduler is being told and a red ring if it refused.
+struct TaskBlockCheckbox: View {
+    let isPending: Bool
+    let hasFailed: Bool
+    let color: Color
+    let help: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                if isPending {
+                    ProgressView()
+                        .controlSize(.mini)
+                        .frame(width: 14, height: 14)
+                } else {
+                    Circle()
+                        .strokeBorder(hasFailed ? Color.red : color, lineWidth: 2)
+                        .frame(width: 14, height: 14)
+                }
+                Circle()
+                    .fill(Color.black.opacity(0.001))
+                    .frame(width: 14, height: 14)
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(isPending)
+        .help(help)
+        .accessibilityLabel(help)
     }
 }
 

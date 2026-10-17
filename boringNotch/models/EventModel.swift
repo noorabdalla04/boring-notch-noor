@@ -27,6 +27,9 @@ struct EventModel: Equatable, Identifiable {
     /// Video-meeting join link recovered from the event's own fields, if any.
     /// Resolved once at fetch time — never on the view path.
     let meetingLink: MeetingLink?
+    /// The calendar server's UID for the event (`calendarItemExternalIdentifier`).
+    /// FlowLocal task blocks are recognised by it; see TaskBlocks.swift.
+    var externalId: String? = nil
 }
 
 enum AttendanceStatus: Comparable {

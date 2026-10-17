@@ -36,6 +36,13 @@ final class CalendarManager: ObservableObject {
         setupEventStoreChangedObserver()
         Task {
             await reloadCalendarAndReminderLists()
+            // Ask at launch, not only when Settings -> Calendar is opened: otherwise a
+            // fresh install (or a new app identity) shows "No events" forever and never
+            // prompts, because nothing ever calls requestFullAccess.
+            if Defaults[.showCalendar] {
+                await checkCalendarAuthorization()
+                await checkReminderAuthorization()
+            }
         }
     }
 
@@ -77,12 +84,22 @@ final class CalendarManager: ObservableObject {
             self.calendarAuthorizationStatus = status
         }
 
+        NSLog("Calendar authorization status at check: \(status.rawValue)")
         switch status {
         case .notDetermined:
-            guard let granted = try? await calendarService.requestAccess(to: .event) else {
+            // A menu-bar (accessory) app is never frontmost, and macOS holds the
+            // permission prompt until the requesting app is -- so the request just
+            // hangs. Come forward for the prompt.
+            await MainActor.run { NSApp.activate(ignoringOtherApps: true) }
+            let granted: Bool
+            do {
+                granted = try await calendarService.requestAccess(to: .event)
+            } catch {
+                NSLog("Calendar access request failed: \(error.localizedDescription)")
                 self.calendarAuthorizationStatus = .notDetermined
                 return
             }
+            NSLog("Calendar access request answered: \(granted ? "granted" : "denied")")
             self.calendarAuthorizationStatus = granted ? .fullAccess : .denied
             if granted {
                 await reloadCalendarAndReminderLists()
@@ -116,6 +133,7 @@ final class CalendarManager: ObservableObject {
 
         switch status {
         case .notDetermined:
+            await MainActor.run { NSApp.activate(ignoringOtherApps: true) }
             guard let granted = try? await calendarService.requestAccess(to: .reminder) else {
                 self.reminderAuthorizationStatus = .notDetermined
                 return

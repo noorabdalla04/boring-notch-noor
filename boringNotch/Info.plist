@@ -2,22 +2,31 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BNUpdateChannel</key>
+	<string>stable</string>
 	<key>CFBundleAllowMixedLocalizations</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>boring.notch analyzes audio from your music app to draw a real-time waveform in the notch. Audio is processed locally and never leaves your Mac.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>This app uses the calendar to display your calendar events and check off FlowSavvy and FlowLocal task blocks</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>This app uses Reminders to display your scheduled reminders in the calendar</string>
 	<key>SUBundleName</key>
 	<string>Boring Notch</string>
 	<key>SUEnableAutomaticChecks</key>
 	<false/>
-	<key>NSAudioCaptureUsageDescription</key>
-	<string>boring.notch analyzes audio from your music app to draw a real-time waveform in the notch. Audio is processed locally and never leaves your Mac.</string>
-	<key>BNUpdateChannel</key>
-	<string>stable</string>
 	<key>SUEnableDownloaderService</key>
 	<true/>
 	<key>SUEnableInstallerLauncherService</key>
 	<true/>
 	<key>SUFeedURL</key>
-	<string>https://TheBoredTeam.github.io/boring.notch/appcast.xml</string>
+	<string>https://127.0.0.1/boring-notch-noor-no-updates.xml</string>
 	<key>SUPublicEDKey</key>
 	<string>B1Y47t8C/v8ImurYA+9arEsuCrpxwJSviekiflMElbI=</string>
 	<key>UTImportedTypeDeclarations</key>

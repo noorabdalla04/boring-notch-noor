@@ -154,7 +154,8 @@ extension EventModel {
                 url: event.url,
                 location: event.location,
                 notes: event.notes
-            )
+            ),
+            externalId: event.calendarItemExternalIdentifier
         )
     }
 
