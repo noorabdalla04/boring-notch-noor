@@ -567,17 +567,25 @@ struct NotchHomeView: View {
     }
 
     private var mainContent: some View {
-        HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            MusicPlayerView(
-                albumArtNamespace: albumArtNamespace,
-                horizontalMediaGestureFeedback: horizontalMediaGestureFeedback,
-                isHoveringMusicArea: $isHoveringMusicArea
-            )
+        let expanded = vm.isWidgetExpanded && Defaults[.showCalendar]
+        return HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
+            // Noor custom: the expanded widget takes the whole panel.
+            if !expanded {
+                MusicPlayerView(
+                    albumArtNamespace: albumArtNamespace,
+                    horizontalMediaGestureFeedback: horizontalMediaGestureFeedback,
+                    isHoveringMusicArea: $isHoveringMusicArea
+                )
+                .transition(.opacity.combined(with: .move(edge: .leading)))
+            }
 
             if Defaults[.showCalendar] {
                 // Noor custom: Calendar · Prayers · Pomodoro, swipe between them.
+                // Kept in the same structural slot whether expanded or not, so the
+                // page you were on survives the resize.
                 HomeWidgetPager()
-                    .frame(width: shouldShowCamera ? 170 : 215)
+                    .frame(width: expanded ? nil : (shouldShowCamera ? 170 : 215))
+                    .frame(maxWidth: expanded ? .infinity : nil, maxHeight: .infinity, alignment: .top)
                     .onHover { isHovering in
                         vm.isHoveringCalendar = isHovering
                     }
@@ -585,12 +593,20 @@ struct NotchHomeView: View {
                     .transition(.opacity)
             }
 
-            if shouldShowCamera {
+            if shouldShowCamera && !expanded {
                 CameraPreviewView(camera: vm.camera)
                     .scaledToFit()
                     .opacity(vm.notchState == .closed ? 0 : 1)
                     .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.76, blendDuration: 0), value: shouldShowCamera)
                 
+            }
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: .bottom) {
+            if Defaults[.showCalendar] && vm.notchState == .open {
+                WidgetExpandGrabber()
+                    // Sit in the panel's bottom padding, right on the edge.
+                    .offset(y: 13)
             }
         }
         .transition(.opacity)

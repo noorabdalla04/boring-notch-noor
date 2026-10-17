@@ -140,7 +140,7 @@ struct ContentView: View {
     /// lever anyway.
     private var openNotchHeight: CGFloat? {
         if notificationManager.activeNotification != nil { return 132 }
-        return Defaults[.compactMode] ? nil : vm.notchSize.height
+        return Defaults[.compactMode] ? nil : vm.liveOpenNotchHeight
     }
 
     /// Compact mode drops the tab bar along with the tabs it switches
@@ -384,7 +384,9 @@ struct ContentView: View {
             }
         }
         .padding(.bottom, 8)
-        .frame(maxWidth: windowSize.width, maxHeight: windowSize.height, alignment: .top)
+        .frame(maxWidth: windowSize.width, maxHeight: vm.widgetWindowTall ? expandedWindowSize.height : windowSize.height, alignment: .top)
+        // Noor custom: grow/shrink the window itself for the expanded widget.
+        .background(WindowHeightSync(height: vm.widgetWindowTall ? expandedWindowSize.height : windowSize.height))
         .ignoresSafeArea(.all)
         .compositingGroup()
         .scaleEffect(
@@ -957,6 +959,13 @@ extension ContentView {
             withAnimation(animationSpring) {
                 gestureProgress = .zero
             }
+        }
+
+        if translation > Defaults[.gestureSensitivity] && vm.isWidgetExpanded {
+            // Expanded widget: scrolling up folds it back before it closes the notch.
+            withAnimation(animationSpring) { gestureProgress = .zero }
+            vm.setWidgetExpanded(false)
+            return
         }
 
         if translation > Defaults[.gestureSensitivity] {

@@ -25,6 +25,12 @@ final class BoringViewModel: NSObject, ObservableObject {
 
     @Published var edgeAutoOpenActive: Bool = false
     @Published var isHoveringCalendar: Bool = false
+    /// Noor custom: the home widget pulled down to its tall size (HomeWidgets.swift).
+    @Published var isWidgetExpanded: Bool = false
+    /// Live drag of the expand grabber, in points (positive = pulling down).
+    @Published var widgetDragOffset: CGFloat = 0
+    /// The window is kept tall while expanded, dragging, or animating back.
+    @Published var widgetWindowTall: Bool = false
     /// Keeps the open notch alive while a popover is showing.
     @Published var isPopoverActive: Bool = false
 
@@ -197,6 +203,9 @@ final class BoringViewModel: NSObject, ObservableObject {
         self.closedNotchSize = self.notchSize
         self.notchState = .closed
         self.isPopoverActive = false
+        self.isWidgetExpanded = false
+        self.widgetDragOffset = 0
+        self.widgetWindowTall = false
         if self.coordinator.shouldShowSneakPeek(on: self.screenUUID) {
             self.coordinator.toggleSneakPeek(status: false, type: .music, targetScreenUUID: self.screenUUID)
         }
