@@ -77,6 +77,8 @@ struct CalendarSettings: View {
                 Text("Ticking a block marks that sitting done: its time counts toward the task and the rest re-plans. Ticking a task's only or last block completes it.")
             }
 
+            PomodoroSettingsSection()
+
             Section(header: Text("Calendars")) {
                 if calendarManager.calendarAuthorizationStatus != .fullAccess {
                     PermissionDeniedNotice(
@@ -229,6 +231,39 @@ private struct FlowSavvyKeyField: View {
                     isSaved = false
                 }
             }
+        }
+    }
+}
+
+/// Noor custom: Pomodoro settings (extensions/Pomodoro.swift). The timer lives on the
+/// third page of the open notch, after Calendar and Prayers.
+struct PomodoroSettingsSection: View {
+    @Default(.pomodoroFocusMinutes) private var focus
+    @Default(.pomodoroShortBreakMinutes) private var shortBreak
+    @Default(.pomodoroPrayerBreakMinutes) private var prayerBreak
+    @Default(.pomodoroAlignToPrayers) private var align
+    @Default(.pomodoroPrayerLeadMinutes) private var lead
+    @Default(.pomodoroAutoStartNext) private var autoStart
+    @Default(.pomodoroSound) private var sound
+    @Default(.pomodoroClosedNotchTimer) private var closedTimer
+
+    var body: some View {
+        Section {
+            Stepper("Ideal focus block: \(focus) min", value: $focus, in: 20...120, step: 5)
+            Stepper("Short break: \(shortBreak) min", value: $shortBreak, in: 3...30)
+            Toggle("Line breaks up with prayer times", isOn: $align)
+            Stepper("Prayer break: \(prayerBreak) min", value: $prayerBreak, in: 5...60, step: 5)
+                .disabled(!align)
+            Stepper(lead == 0 ? "Prayer break starts at the adhan" : "Prayer break starts \(lead) min before the adhan",
+                    value: $lead, in: 0...30, step: 5)
+                .disabled(!align)
+            Toggle("Run blocks and breaks back to back", isOn: $autoStart)
+            Toggle("Play a sound when a block ends", isOn: $sound)
+            Toggle("Show the timer in the closed notch", isOn: $closedTimer)
+        } header: {
+            Text("Pomodoro")
+        } footer: {
+            Text("Starting a focus run splits the time until the next adhan into blocks as close to the ideal as possible, so the last one ends when it's time to pray. Adhan times come from your prayer times calendar. After a prayer break, start the next run yourself.")
         }
     }
 }

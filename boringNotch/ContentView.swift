@@ -22,6 +22,8 @@ struct ContentView: View {
     @ObservedObject var brightnessManager = BrightnessManager.shared
     @ObservedObject var volumeManager = VolumeManager.shared
     @ObservedObject var notificationManager = SystemNotificationManager.shared
+    @ObservedObject var pomodoro = PomodoroManager.shared
+    @Default(.pomodoroClosedNotchTimer) var pomodoroClosedNotchTimer
     /// Which entry of the closed-notch activity stack is on top.
     @State private var activityIndex: Int = 0
     @State private var hoverTask: Task<Void, Never>?
@@ -105,6 +107,11 @@ struct ContentView: View {
 
         if let notification = notificationManager.activeNotification {
             items.append(.notification(notification))
+        }
+
+        // A running Pomodoro sits in front of music: it's the more time-bound of the two.
+        if pomodoro.wantsClosedNotch && pomodoroClosedNotchTimer {
+            items.append(.pomodoro)
         }
 
         let musicIsShowing = (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
@@ -204,6 +211,8 @@ struct ContentView: View {
             switch activity {
             case .notification:
                 chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
+            case .pomodoro:
+                chinWidth += (max(0, vm.effectiveClosedNotchHeight - 12) + PomodoroLiveActivity.labelWidth + 20)
             case .music:
                 chinWidth += (2 * max(0, displayClosedNotchHeight - 12) + 20 + 2 * liveActivityEdgeMargin + 2)
                 // The inline song-change peek widens the pill itself, so the
@@ -338,6 +347,10 @@ struct ContentView: View {
                     // even if the user had swiped away to music.
                     .onChange(of: notificationManager.activeNotification?.id) { _, newID in
                         if newID != nil { activityIndex = 0 }
+                    }
+                    // Starting a Pomodoro brings its timer to the front of the stack.
+                    .onChange(of: pomodoro.isActive) { _, active in
+                        if active, let index = liveActivities.firstIndex(of: .pomodoro) { activityIndex = index }
                     }
                     // Activities disappear on their own (a notification
                     // expires, music stops). Keep the selection in range so
@@ -475,6 +488,8 @@ struct ContentView: View {
                               switch item {
                               case .notification(let notification):
                                   NotificationLiveActivity(notification: notification)
+                              case .pomodoro:
+                                  PomodoroLiveActivity()
                               case .music:
                                   MusicLiveActivity()
                                       .frame(alignment: .center)

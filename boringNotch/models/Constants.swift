@@ -454,6 +454,18 @@ extension Defaults.Keys {
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     /// Checkboxes on FlowSavvy / FlowLocal task blocks (TaskBlocks.swift).
     static let taskBlockCheckboxes = Key<Bool>("taskBlockCheckboxes", default: true)
+
+    // MARK: Pomodoro (Noor custom; see extensions/Pomodoro.swift)
+    /// The focus length the planner aims for; blocks stretch or shrink around it to land on prayer.
+    static let pomodoroFocusMinutes = Key<Int>("pomodoroFocusMinutes", default: 60)
+    static let pomodoroShortBreakMinutes = Key<Int>("pomodoroShortBreakMinutes", default: 10)
+    static let pomodoroPrayerBreakMinutes = Key<Int>("pomodoroPrayerBreakMinutes", default: 20)
+    static let pomodoroAlignToPrayers = Key<Bool>("pomodoroAlignToPrayers", default: true)
+    /// Start the prayer break this many minutes before the adhan.
+    static let pomodoroPrayerLeadMinutes = Key<Int>("pomodoroPrayerLeadMinutes", default: 0)
+    static let pomodoroAutoStartNext = Key<Bool>("pomodoroAutoStartNext", default: true)
+    static let pomodoroSound = Key<Bool>("pomodoroSound", default: true)
+    static let pomodoroClosedNotchTimer = Key<Bool>("pomodoroClosedNotchTimer", default: true)
     static let sliderColor = Key<SliderColorEnum>(
         "sliderUseAlbumArtColor",
         default: SliderColorEnum.white

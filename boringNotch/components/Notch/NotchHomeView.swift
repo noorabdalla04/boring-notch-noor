@@ -575,7 +575,8 @@ struct NotchHomeView: View {
             )
 
             if Defaults[.showCalendar] {
-                CalendarView()
+                // Noor custom: Calendar · Prayers · Pomodoro, swipe between them.
+                HomeWidgetPager()
                     .frame(width: shouldShowCamera ? 170 : 215)
                     .onHover { isHovering in
                         vm.isHoveringCalendar = isHovering

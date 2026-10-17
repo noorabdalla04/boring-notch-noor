@@ -6,6 +6,9 @@
 # Customisations on this branch (noor-custom, based on tag v2.8-rc.2):
 #   - FlowSavvy / FlowLocal task blocks get a checkbox in the notch calendar
 #     (boringNotch/extensions/TaskBlocks.swift; Settings -> Calendar -> Task blocks)
+#   - Open notch home: swipeable Calendar · Prayers · Pomodoro pager
+#     (extensions/HomeWidgets.swift, PrayerTimes.swift, Pomodoro.swift); a running
+#     Pomodoro shows its time left in the closed notch
 #   - Bundle id theboringteam.boringnotch.noor, so it runs beside the official app
 #   - Update feed points nowhere, so an official update can never replace this build
 #
