@@ -311,6 +311,8 @@ final class PomodoroManager: ObservableObject {
     // MARK: Persistence (a relaunch or rebuild mid-session keeps the timer)
 
     private func persist() {
+        // The UI sandbox shares this app's settings; it must never overwrite the real timer.
+        guard !NoorLab.isRequested else { return }
         var state: [String: Any] = ["phase": phase.rawValue, "duration": phaseDuration]
         if let endDate { state["end"] = endDate.timeIntervalSince1970 }
         if let pausedRemaining { state["paused"] = pausedRemaining }
@@ -592,273 +594,98 @@ struct PomodoroLiveActivity: View {
     }
 }
 
-// MARK: - Expanded page
+// MARK: - Card (pulled-down notch)
 
-/// One stretch of the run from now until the prayer, for the expanded timeline.
-struct PomodoroSegment: Identifiable {
-    let id: Int
-    let phase: PomodoroPhase
-    let start: Date
-    let end: Date
-    var isCurrent: Bool
-    var label: String
-}
-
-extension PomodoroManager {
-    /// The run laid out in time: the block in progress (or about to start), the
-    /// blocks and breaks after it, and the prayer break it lands on. Later blocks
-    /// use the same arithmetic the planner will redo when they start.
-    func segments(at now: Date) -> [PomodoroSegment] {
-        var out: [PomodoroSegment] = []
-        func add(_ phase: PomodoroPhase, _ start: Date, _ end: Date, current: Bool = false, label: String? = nil) {
-            let minutes = PomodoroFormat.minutes(end.timeIntervalSince(start) / 60)
-            let text = label ?? (phase == .focus ? "Focus \(minutes)" : "Break \(minutes)")
-            out.append(PomodoroSegment(id: out.count, phase: phase, start: start, end: end, isCurrent: current, label: text))
-        }
-
-        let currentEnd = endDate ?? now.addingTimeInterval(remaining(at: now))
-        if phase == .prayer {
-            add(.prayer, currentEnd.addingTimeInterval(-phaseDuration), currentEnd, current: true,
-                label: "\(phaseTitle) · prayer break")
-            return out
-        }
-
-        let plan = (isActive ? self.plan : nil) ?? preview(at: now)
-        let shortBreak = plan.shortBreakMinutes * 60
-        var focusLeft: Int
-        var cursor: Date
-        var lastWasFocus: Bool
-
-        if phase == .focus {
-            let start = isActive ? currentEnd.addingTimeInterval(-phaseDuration) : now
-            let end = isActive ? currentEnd : now.addingTimeInterval(plan.blocks == 1 && plan.breakStart != nil
-                ? plan.breakStart!.timeIntervalSince(now) : plan.focusMinutes * 60)
-            add(.focus, start, end, current: isActive)
-            focusLeft = plan.blocks - 1
-            cursor = end
-            lastWasFocus = true
-        } else {
-            let start = isActive ? currentEnd.addingTimeInterval(-phaseDuration) : now
-            let end = isActive ? currentEnd : now.addingTimeInterval(phaseDuration)
-            add(.shortBreak, start, end, current: isActive)
-            focusLeft = max(1, plan.blocks - 1)
-            cursor = end
-            lastWasFocus = false
-        }
-
-        if focusLeft > 0 {
-            var focus = plan.focusMinutes * 60
-            if let breakStart = plan.breakStart {
-                let breaks = Double(lastWasFocus ? focusLeft : focusLeft - 1)
-                focus = max(60, (breakStart.timeIntervalSince(cursor) - breaks * shortBreak) / Double(focusLeft))
-            }
-            for _ in 0..<min(focusLeft, 10) {
-                if lastWasFocus {
-                    add(.shortBreak, cursor, cursor.addingTimeInterval(shortBreak))
-                    cursor = cursor.addingTimeInterval(shortBreak)
-                }
-                add(.focus, cursor, cursor.addingTimeInterval(focus))
-                cursor = cursor.addingTimeInterval(focus)
-                lastWasFocus = true
-            }
-        }
-
-        if let name = plan.prayerName, let breakStart = plan.breakStart {
-            add(.prayer, breakStart, breakStart.addingTimeInterval(Self.freshDuration(of: .prayer)),
-                label: "\(name) · prayer break")
-        }
-        return out
-    }
-}
-
-/// The Pomodoro page when the widget is pulled down: a big ring and controls on
-/// the left, the whole run until the prayer laid out on the right.
-struct PomodoroExpandedView: View {
+/// The Pomodoro card under the music player when the notch is pulled down.
+struct PomodoroCardView: View {
     @ObservedObject private var pomodoro = PomodoroManager.shared
     @ObservedObject private var prayers = PrayerTimesManager.shared
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            content(now: context.date)
+            WidgetCard { content(now: context.date) }
         }
-        .onAppear { prayers.refresh() }
     }
 
     private func content(now: Date) -> some View {
         let color = pomodoro.isPaused ? Color.gray : pomodoro.phase.color
-        let segments = pomodoro.segments(at: now)
         let plan = (pomodoro.isActive ? pomodoro.plan : nil) ?? pomodoro.preview(at: now)
-
-        return HStack(alignment: .top, spacing: 24) {
-            VStack(spacing: 14) {
-                ZStack {
-                    PomodoroRing(progress: pomodoro.progress(at: now), color: color, lineWidth: 9)
-                    VStack(spacing: 2) {
-                        Text(PomodoroFormat.clock(pomodoro.remaining(at: now)))
-                            .font(.system(size: 32, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .minimumScaleFactor(0.6)
-                            .lineLimit(1)
-                        Text(pomodoro.isPaused ? "paused" : (pomodoro.isRunning ? pomodoro.phaseTitle.lowercased() : "ready"))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(pomodoro.isActive ? color : .gray)
-                    }
-                    .padding(.horizontal, 18)
-                }
-                .frame(width: 160, height: 160)
-
-                HStack(spacing: 8) {
-                    Button(action: pomodoro.toggle) {
-                        Label(pomodoro.isRunning ? "Pause" : (pomodoro.isPaused ? "Resume" : "Start"),
-                              systemImage: pomodoro.isRunning ? "pause.fill" : "play.fill")
-                            .font(.system(size: 13, weight: .semibold))
-                            .frame(width: 96, height: 30)
-                            .background(Capsule().fill(pomodoro.phase.color.opacity(0.9)))
-                            .foregroundStyle(.black)
-                    }
-                    .buttonStyle(.plain)
-                    iconButton("stop.fill", help: "Stop and reset", enabled: pomodoro.isActive || pomodoro.phase != .focus, action: pomodoro.stop)
-                    iconButton("forward.end.fill", help: "End this block now", enabled: pomodoro.isActive, action: pomodoro.skip)
-                }
-            }
-            .frame(width: 190)
-
-            VStack(alignment: .leading, spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    if let name = plan.prayerName, let breakStart = plan.breakStart {
-                        Text("Until \(name) · \(PomodoroFormat.time(breakStart))")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                    } else {
-                        Text("No prayer in the next 8 hours")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(.white)
-                    }
-                    Text((pomodoro.isActive ? "" : "Start now: ") + PomodoroFormat.summary(plan))
-                        .font(.system(size: 11))
-                        .foregroundStyle(.gray)
-                        .lineLimit(2)
-                }
-
-                timeline(segments, now: now)
-                    .frame(height: 12)
-
-                VStack(spacing: 3) {
-                    ForEach(segments.prefix(8)) { segment in
-                        row(segment, now: now)
-                    }
-                }
-
-                laterToday(after: plan, now: now)
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.horizontal, 8)
-        .padding(.top, 10)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private func timeline(_ segments: [PomodoroSegment], now: Date) -> some View {
-        GeometryReader { geo in
-            if let first = segments.first, let last = segments.last {
-                let span = max(1, last.end.timeIntervalSince(first.start))
-                let x: (Date) -> CGFloat = { CGFloat(min(1, max(0, $0.timeIntervalSince(first.start) / span))) * geo.size.width }
-                ZStack(alignment: .leading) {
-                    ForEach(segments) { segment in
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(segment.phase.color.opacity(segment.end <= now ? 0.35 : 0.85))
-                            .frame(width: max(2, x(segment.end) - x(segment.start) - 2), height: 10)
-                            .offset(x: x(segment.start))
-                    }
-                    if now > first.start && now < last.end {
-                        RoundedRectangle(cornerRadius: 1).fill(.white)
-                            .frame(width: 2, height: 14)
-                            .offset(x: x(now) - 1)
-                    }
-                }
-            }
-        }
-    }
-
-    private func row(_ segment: PomodoroSegment, now: Date) -> some View {
-        HStack(spacing: 8) {
-            Circle().fill(segment.phase.color).frame(width: 7, height: 7)
-            Text(segment.label)
-                .font(.system(size: 12, weight: segment.isCurrent ? .semibold : .regular))
-                .foregroundStyle(segment.end <= now ? .gray : .white)
-            Spacer(minLength: 0)
-            Text("\(PomodoroFormat.time(segment.start)) – \(PomodoroFormat.time(segment.end))")
-                .font(.system(size: 11))
-                .monospacedDigit()
-                .foregroundStyle(.gray)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(segment.isCurrent ? segment.phase.color.opacity(0.15) : .clear)
-        )
-    }
-
-    /// The rest of the day's prayer windows and how each would be split, so the
-    /// day's rhythm is visible at a glance.
-    @ViewBuilder
-    private func laterToday(after plan: PomodoroPlan, now: Date) -> some View {
-        let windows = Self.laterWindows(after: plan, now: now)
-        if !windows.isEmpty {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Later today")
-                    .font(.system(size: 11, weight: .semibold))
+        return VStack(spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Pomodoro")
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.gray)
-                ForEach(windows, id: \.to) { window in
-                    HStack(spacing: 6) {
-                        Text("\(window.from) → \(window.to)")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.8))
-                        Spacer(minLength: 0)
-                        Text(window.plan)
-                            .font(.system(size: 11))
-                            .monospacedDigit()
-                            .foregroundStyle(.gray)
-                    }
+                Spacer(minLength: 4)
+                if let name = plan.prayerName, let breakStart = plan.breakStart {
+                    Label("\(name) \(PomodoroFormat.time(breakStart))", systemImage: "moon.stars.fill")
+                        .labelStyle(.titleAndIcon)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(PomodoroPhase.prayer.color)
+                        .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.04)))
+
+            ZStack {
+                PomodoroRing(progress: pomodoro.progress(at: now), color: color, lineWidth: 6)
+                VStack(spacing: 0) {
+                    Text(PomodoroFormat.clock(pomodoro.remaining(at: now)))
+                        .font(.system(size: 21, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(.white)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                    Text(statusText)
+                        .font(.system(size: 9.5, weight: .medium))
+                        .foregroundStyle(pomodoro.isActive ? color : .gray)
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 12)
+            }
+            .frame(width: 96, height: 96)
+
+            Text(planLine(plan))
+                .font(.system(size: 10))
+                .foregroundStyle(.gray)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+
+            HStack(spacing: 6) {
+                Button(action: pomodoro.toggle) {
+                    Image(systemName: pomodoro.isRunning ? "pause.fill" : "play.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .background(Capsule().fill(pomodoro.phase.color.opacity(0.9)))
+                        .foregroundStyle(.black)
+                }
+                .buttonStyle(.plain)
+                .help(pomodoro.isRunning ? "Pause" : (pomodoro.isPaused ? "Resume" : "Start"))
+                smallButton("stop.fill", help: "Stop and reset", enabled: pomodoro.isActive || pomodoro.phase != .focus, action: pomodoro.stop)
+                smallButton("forward.end.fill", help: "End this block now", enabled: pomodoro.isActive, action: pomodoro.skip)
+            }
         }
+        .frame(maxWidth: .infinity)
     }
 
-    /// Each window between consecutive prayers after the current target, planned
-    /// as if a run started right after that prayer's break.
-    static func laterWindows(after plan: PomodoroPlan, now: Date) -> [(from: String, to: String, plan: String)] {
-        guard let target = plan.prayerTime else { return [] }
-        let prayers = PrayerTimesManager.shared.upcomingPrayers(after: now)
-            .filter { $0.time >= target && Calendar.current.isDate($0.time, inSameDayAs: target) }
-        let ideal = Double(max(1, Defaults[.pomodoroFocusMinutes]))
-        let shortBreak = Double(max(1, Defaults[.pomodoroShortBreakMinutes]))
-        let lead = Double(max(0, Defaults[.pomodoroPrayerLeadMinutes])) * 60
-        let prayerBreak = PomodoroManager.freshDuration(of: .prayer)
-        var out: [(String, String, String)] = []
-        for (a, b) in zip(prayers, prayers.dropFirst()) {
-            let start = a.time.addingTimeInterval(-lead + prayerBreak)
-            let available = b.time.addingTimeInterval(-lead).timeIntervalSince(start) / 60
-            guard available >= 10 else { continue }
-            let fit = PomodoroPlanner.fit(available: available, ideal: ideal, shortBreak: shortBreak)
-            let shape = fit.blocks == 1 ? "1 × \(PomodoroFormat.minutes(fit.focus))"
-                                        : "\(fit.blocks) × \(PomodoroFormat.minutes(fit.focus))"
-            out.append(("\(a.name) \(PomodoroFormat.time(start))", b.name, shape))
-        }
-        return out.map { (from: $0.0, to: $0.1, plan: $0.2) }
+    private var statusText: String {
+        if pomodoro.isPaused { return "paused" }
+        if pomodoro.isRunning { return pomodoro.phaseTitle.lowercased() }
+        return "ready"
     }
 
-    private func iconButton(_ symbol: String, help: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+    private func planLine(_ plan: PomodoroPlan) -> String {
+        if pomodoro.phase == .prayer { return "Back after \(pomodoro.phaseTitle)" }
+        let blocks = plan.blocks == 1
+            ? "\(PomodoroFormat.minutes(plan.focusMinutes)) focus"
+            : "\(plan.blocks) × \(PomodoroFormat.minutes(plan.focusMinutes)) focus"
+        return pomodoro.isActive ? blocks + " planned" : "Start: " + blocks
+    }
+
+    private func smallButton(_ symbol: String, help: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 34, height: 30)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 30, height: 26)
                 .background(Capsule().fill(Color.white.opacity(0.1)))
                 .foregroundStyle(.white)
         }

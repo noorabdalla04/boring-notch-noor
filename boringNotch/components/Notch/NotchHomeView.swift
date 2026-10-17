@@ -562,30 +562,50 @@ struct NotchHomeView: View {
             .transition(.opacity)
     }
 
+    /// The music player's height in the normal open notch (190 tall, less the
+    /// header and paddings) -- fixed so the pull-down never squeezes it.
+    private let musicPlayerHeight: CGFloat = 128
+    /// The cards' full height once pulled down: the extra 240 pt, less spacing.
+    private var expandedCardsHeight: CGFloat {
+        expandedNotchSize.height - openNotchSize.height - 12
+    }
+
     private var shouldShowCamera: Bool {
         Defaults[.showMirror] && vm.camera.cameraAvailable && vm.camera.isSessionRunning
     }
 
     private var mainContent: some View {
-        let expanded = vm.isWidgetExpanded && Defaults[.showCalendar]
-        return HStack(alignment: .top, spacing: (shouldShowCamera && Defaults[.showCalendar]) ? 10 : 15) {
-            // Noor custom: the expanded widget takes the whole panel.
-            if !expanded {
+        let widgets = Defaults[.showCalendar]
+        // Noor custom: pulling the notch down reveals the Pomodoro and Prayers
+        // cards under the music player; they fade in as the notch grows.
+        let progress = widgets ? vm.widgetExpansionProgress : 0
+        return HStack(alignment: .top, spacing: (shouldShowCamera && widgets) ? 10 : 15) {
+            VStack(alignment: .leading, spacing: 12) {
                 MusicPlayerView(
                     albumArtNamespace: albumArtNamespace,
                     horizontalMediaGestureFeedback: horizontalMediaGestureFeedback,
                     isHoveringMusicArea: $isHoveringMusicArea
                 )
-                .transition(.opacity.combined(with: .move(edge: .leading)))
-            }
+                // The player keeps its size; the cards only ever take new room.
+                .frame(height: musicPlayerHeight)
 
-            if Defaults[.showCalendar] {
-                // Noor custom: Calendar · Prayers · Pomodoro, swipe between them.
-                // Kept in the same structural slot whether expanded or not, so the
-                // page you were on survives the resize.
+                if progress > 0.02 {
+                    ExpandedWidgetCards()
+                        .frame(height: expandedCardsHeight)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .clipped()
+                        .opacity(Double(min(1, progress * 1.4)))
+                        .allowsHitTesting(vm.isWidgetExpanded)
+                }
+            }
+            .frame(maxHeight: .infinity, alignment: .top)
+
+            if widgets {
+                // Calendar · Prayers · Pomodoro, swipe between them; the calendar
+                // alone, full height, while pulled down.
                 HomeWidgetPager()
-                    .frame(width: expanded ? nil : (shouldShowCamera ? 170 : 215))
-                    .frame(maxWidth: expanded ? .infinity : nil, maxHeight: .infinity, alignment: .top)
+                    .frame(width: shouldShowCamera && !vm.isWidgetExpanded ? 170 : 215)
+                    .frame(maxHeight: .infinity, alignment: .top)
                     .onHover { isHovering in
                         vm.isHoveringCalendar = isHovering
                     }
@@ -593,7 +613,7 @@ struct NotchHomeView: View {
                     .transition(.opacity)
             }
 
-            if shouldShowCamera && !expanded {
+            if shouldShowCamera && !vm.isWidgetExpanded {
                 CameraPreviewView(camera: vm.camera)
                     .scaledToFit()
                     .opacity(vm.notchState == .closed ? 0 : 1)
@@ -603,10 +623,11 @@ struct NotchHomeView: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) {
-            if Defaults[.showCalendar] && vm.notchState == .open {
+            if widgets && vm.notchState == .open {
+                // The pull strip sits in the panel's bottom padding, clear of the
+                // music controls.
                 WidgetExpandGrabber()
-                    // Sit in the panel's bottom padding, right on the edge.
-                    .offset(y: 13)
+                    .offset(y: 14)
             }
         }
         .transition(.opacity)

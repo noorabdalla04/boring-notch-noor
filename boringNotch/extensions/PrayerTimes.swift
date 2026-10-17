@@ -248,16 +248,15 @@ struct PrayerTimesPageView: View {
     }
 }
 
-// MARK: - Expanded page
+// MARK: - Card (pulled-down notch)
 
-/// The Prayers page when the widget is pulled down: a big countdown, the day
-/// as a timeline from Fajr to Isha, a card per prayer, and tomorrow's times.
-struct PrayerTimesExpandedView: View {
+/// The Prayers card under the music player when the notch is pulled down.
+struct PrayerCardView: View {
     @ObservedObject private var prayers = PrayerTimesManager.shared
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 15)) { context in
-            content(now: context.date)
+            WidgetCard { content(now: context.date) }
         }
         .onAppear { prayers.refresh() }
     }
@@ -268,179 +267,79 @@ struct PrayerTimesExpandedView: View {
         let showingTomorrow = !prayers.today.isEmpty && prayers.today.allSatisfy { $0.time <= now }
         let list = showingTomorrow ? prayers.tomorrow : prayers.today
 
-        return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(showingTomorrow ? "Tomorrow" : "Prayers")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(.white)
-                    Text((showingTomorrow ? now.addingTimeInterval(86_400) : now)
-                        .formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                        .font(.system(size: 12))
-                        .foregroundStyle(.gray)
-                }
-                Spacer()
+        return VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(next.map { "\($0.name) in" } ?? (showingTomorrow ? "Tomorrow" : "Prayers"))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.gray)
                 if let next {
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text("\(next.name) in")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.gray)
-                        Text(PrayerTimesPageView.until(next.time, from: now))
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(Color.effectiveAccent)
-                    }
+                    Text(PrayerTimesPageView.until(next.time, from: now))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(Color.effectiveAccent)
                 }
             }
 
             if list.isEmpty {
-                Text(prayers.loadedDay == nil ? "Loading…" : "No prayer times in your calendars for today.")
-                    .font(.system(size: 13))
+                Text(prayers.loadedDay == nil ? "Loading…" : "No prayer times today.")
+                    .font(.system(size: 11))
                     .foregroundStyle(.gray)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                dayTimeline(list, now: now, tomorrow: showingTomorrow)
-                    .frame(height: 46)
-
-                HStack(spacing: 8) {
+                VStack(spacing: 1) {
+                    HStack(spacing: 4) {
+                        Spacer()
+                        Text("iqama").frame(width: 34, alignment: .trailing)
+                        Text("adhan").frame(width: 38, alignment: .trailing)
+                    }
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(Color.gray.opacity(0.7))
+                    .padding(.horizontal, 5)
                     ForEach(list) { prayer in
-                        card(prayer, now: now,
-                             isNext: prayer.id == next?.id,
-                             isCurrent: !showingTomorrow && prayer.id == current?.id,
-                             isPast: !showingTomorrow && prayer.time <= now && prayer.id != current?.id)
+                        row(prayer,
+                            isNext: prayer.id == next?.id,
+                            isCurrent: !showingTomorrow && prayer.id == current?.id,
+                            isPast: !showingTomorrow && prayer.time <= now && prayer.id != current?.id)
                     }
                 }
-
-                if !showingTomorrow && !prayers.tomorrow.isEmpty {
-                    tomorrowStrip(prayers.tomorrow)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 8)
-        .padding(.top, 6)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    /// Fajr to Isha as one line, ticks at each adhan, a marker for now. Labels
-    /// alternate above and below the line so close prayers don't collide.
-    private func dayTimeline(_ list: [PrayerTime], now: Date, tomorrow: Bool) -> some View {
-        GeometryReader { geo in
-            let start = list.first!.time, end = list.last!.time
-            let span = max(1, end.timeIntervalSince(start))
-            let width = geo.size.width
-            let x: (Date) -> CGFloat = { date in
-                CGFloat(min(1, max(0, date.timeIntervalSince(start) / span))) * width
-            }
-            let lineY: CGFloat = 21
-            ZStack(alignment: .topLeading) {
-                Capsule().fill(Color.white.opacity(0.1)).frame(height: 4).offset(y: lineY - 2)
-                if !tomorrow {
-                    Capsule().fill(Color.effectiveAccent.opacity(0.6))
-                        .frame(width: x(now), height: 4).offset(y: lineY - 2)
-                }
-                ForEach(Array(list.enumerated()), id: \.element.id) { index, prayer in
-                    Circle()
-                        .fill(Color.white.opacity(prayer.isPrayer ? 0.85 : 0.4))
-                        .frame(width: 8, height: 8)
-                        .offset(x: x(prayer.time) - 4, y: lineY - 4)
-                    Text(prayer.name)
-                        .font(.system(size: 9.5))
-                        .foregroundStyle(.gray)
-                        .fixedSize()
-                        .frame(width: 64)
-                        .offset(x: min(max(-14, x(prayer.time) - 32), width - 50),
-                                y: index.isMultiple(of: 2) ? lineY + 8 : lineY - 20)
-                }
-                if !tomorrow && now >= start && now <= end {
-                    RoundedRectangle(cornerRadius: 1)
-                        .fill(Color.effectiveAccent)
-                        .frame(width: 2, height: 16)
-                        .offset(x: x(now) - 1, y: lineY - 8)
-                }
             }
         }
     }
 
-    private func card(_ prayer: PrayerTime, now: Date, isNext: Bool, isCurrent: Bool, isPast: Bool) -> some View {
+    private func row(_ prayer: PrayerTime, isNext: Bool, isCurrent: Bool, isPast: Bool) -> some View {
         let tint: Color = isNext ? .effectiveAccent : (isPast ? .gray : .white)
-        let (clock, meridiem) = Self.split(prayer.time)
-        return VStack(alignment: .leading, spacing: 3) {
-            HStack(spacing: 4) {
-                Text(prayer.name)
-                    .font(.system(size: 12, weight: .semibold))
-                if isCurrent { Circle().fill(Color.effectiveAccent).frame(width: 5, height: 5) }
-            }
-            .foregroundStyle(tint)
-            HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(clock)
-                    .font(.system(size: 19, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .fixedSize()
-                Text(meridiem)
-                    .font(.system(size: 9.5, weight: .medium))
-                    .fixedSize()
-            }
-            .foregroundStyle(tint)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            Text(prayer.iqama.map { "iqama \(PrayerTimesPageView.clock($0))" } ?? (prayer.isPrayer ? "–" : "Fajr ends"))
+        return HStack(spacing: 4) {
+            Text(prayer.name)
+                .font(.system(size: 11.5, weight: isNext || isCurrent ? .semibold : .regular))
+            if isCurrent { Circle().fill(Color.effectiveAccent).frame(width: 4, height: 4) }
+            Spacer(minLength: 2)
+            Text(prayer.iqama.map(Self.short) ?? "")
                 .font(.system(size: 10))
-                .foregroundStyle(prayer.iqama == nil && prayer.isPrayer ? Color.gray.opacity(0.5) : .gray)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(Self.relative(prayer.time, now: now))
-                .font(.system(size: 10, weight: isNext ? .semibold : .regular))
-                .foregroundStyle(isNext ? Color.effectiveAccent : Color.gray.opacity(0.8))
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(isNext ? Color.effectiveAccent.opacity(0.16) : Color.white.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(isNext ? Color.effectiveAccent.opacity(0.7) : .clear, lineWidth: 1)
-        )
-        .opacity(isPast ? 0.6 : 1)
-    }
-
-    private func tomorrowStrip(_ list: [PrayerTime]) -> some View {
-        HStack(spacing: 0) {
-            Text("Tomorrow")
-                .font(.system(size: 11, weight: .semibold))
+                .monospacedDigit()
                 .foregroundStyle(.gray)
-                .frame(width: 70, alignment: .leading)
-            ForEach(list) { prayer in
-                VStack(alignment: .leading, spacing: 1) {
-                    Text(prayer.name).font(.system(size: 9.5)).foregroundStyle(.gray)
-                    Text(PrayerTimesPageView.clock(prayer.time))
-                        .font(.system(size: 11, weight: .medium))
-                        .monospacedDigit()
-                        .foregroundStyle(.white.opacity(0.8))
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
+                .frame(width: 34, alignment: .trailing)
+                .help(prayer.iqama == nil ? "" : "Iqama\(prayer.place.map { " at \($0)" } ?? "")")
+            Text(Self.short(prayer.time))
+                .font(.system(size: 11.5, weight: isNext ? .semibold : .regular))
+                .monospacedDigit()
+                .frame(width: 38, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.white.opacity(0.04)))
+        .foregroundStyle(tint)
+        .lineLimit(1)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 2)
+        .background(RoundedRectangle(cornerRadius: 5).fill(isNext ? Color.effectiveAccent.opacity(0.16) : .clear))
+        .opacity(prayer.isPrayer ? 1 : 0.7)
+        .help("\(prayer.name) \(PrayerTimesPageView.clock(prayer.time))")
     }
 
-    /// "3:44" and "PM" separately, so the time can be big and the suffix small.
-    static func split(_ date: Date) -> (String, String) {
-        let text = PrayerTimesPageView.clock(date)
-        guard let space = text.lastIndex(where: { $0 == " " || $0 == "\u{202F}" }) else { return (text, "") }
-        return (String(text[..<space]), String(text[text.index(after: space)...]))
+    /// "6:00", "12:48": the card is narrow, and which half of the day is obvious.
+    static func short(_ date: Date) -> String {
+        shortFormatter.string(from: date)
     }
 
-    static func relative(_ date: Date, now: Date) -> String {
-        if date > now { return "in " + PrayerTimesPageView.until(date, from: now) }
-        let minutes = Int(now.timeIntervalSince(date) / 60)
-        if minutes < 60 { return "\(minutes)m ago" }
-        return "\(minutes / 60)h \(minutes % 60)m ago"
-    }
+    private static let shortFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm"
+        return formatter
+    }()
 }

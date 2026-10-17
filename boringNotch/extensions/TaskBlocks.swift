@@ -131,6 +131,8 @@ enum FlowSavvyKeychain {
     private static let account = "api-key"
 
     static func read() -> String? {
+        // The UI sandbox (NoorLab) never touches the Keychain: no access prompts.
+        guard !NoorLab.isRequested else { return nil }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

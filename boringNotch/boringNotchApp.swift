@@ -203,9 +203,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Noor custom: the UI sandbox (NoorLab.swift) runs instead of the app.
+        if NoorLab.isRequested {
+            NoorLab.start(camera: camera)
+            return
+        }
         SettingsWindowController.shared.setCamera(camera)
         migrateDisplayModeIfNeeded()
-        WidgetSnapshots.install()   // Noor custom: offscreen widget snapshots
 
         NotificationCenter.default.addObserver(
             self,

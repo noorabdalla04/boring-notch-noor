@@ -9,8 +9,9 @@
 #   - Open notch home: swipeable Calendar · Prayers · Pomodoro pager
 #     (extensions/HomeWidgets.swift, PrayerTimes.swift, Pomodoro.swift); a running
 #     Pomodoro shows its time left in the closed notch
-#   - Drag the grabber at the bottom of the open notch down (or click it) to expand
-#     the widget to 640 x 430; ./noor-snapshot.sh renders the pages offscreen
+#   - Pull the open notch down (drag/click the bottom strip, or scroll down) to
+#     640 x 430: Pomodoro + Prayers cards under the player, calendar full height
+#   - ./noor-lab.sh: UI sandbox (NoorLab.swift) for testing off-screen
 #   - Bundle id theboringteam.boringnotch.noor, so it runs beside the official app
 #   - Update feed points nowhere, so an official update can never replace this build
 #

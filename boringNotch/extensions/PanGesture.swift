@@ -90,7 +90,10 @@ private struct ScrollMonitor: NSViewRepresentable {
 
             // Local monitor for normal in-window scroll events.
             localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel]) { [weak self, weak view] event in
-                guard let self = self, event.window === view?.window else { return event }
+                // NoorLab's synthetic scrolls carry no window; accept them in the lab only.
+                guard let self = self,
+                      event.window === view?.window || (event.window == nil && NoorLab.isRequested)
+                else { return event }
                 self.handleScroll(event)
                 return event
             }

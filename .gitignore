@@ -53,4 +53,5 @@ build/
 *.xcarchive
 *.dSYM
 
-snapshots/
+build-lab/
+lab-shots/

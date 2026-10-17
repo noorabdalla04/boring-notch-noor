@@ -31,6 +31,10 @@ final class BoringViewModel: NSObject, ObservableObject {
     @Published var widgetDragOffset: CGFloat = 0
     /// The window is kept tall while expanded, dragging, or animating back.
     @Published var widgetWindowTall: Bool = false
+    /// A pull-down drag is in flight.
+    @Published var isDraggingWidget: Bool = false
+    /// Hover-exit doesn't close the notch until this moment (just after a pull).
+    var widgetHoldUntil: Date = .distantPast
     /// Keeps the open notch alive while a popover is showing.
     @Published var isPopoverActive: Bool = false
 
@@ -206,6 +210,7 @@ final class BoringViewModel: NSObject, ObservableObject {
         self.isWidgetExpanded = false
         self.widgetDragOffset = 0
         self.widgetWindowTall = false
+        self.isDraggingWidget = false
         if self.coordinator.shouldShowSneakPeek(on: self.screenUUID) {
             self.coordinator.toggleSneakPeek(status: false, type: .music, targetScreenUUID: self.screenUUID)
         }

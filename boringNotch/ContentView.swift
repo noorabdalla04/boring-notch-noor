@@ -853,6 +853,7 @@ extension ContentView {
                 if self.vm.notchState == .open,
                    !self.isHovering,
                    !self.vm.isPopoverActive,
+                   !self.vm.holdsOpenForWidget,
                    !SharingStateManager.shared.preventNotchClose {
                     self.vm.close()
                 }
@@ -915,6 +916,7 @@ extension ContentView {
 
                     if self.vm.notchState == .open,
                        !self.vm.isPopoverActive,
+                       !self.vm.holdsOpenForWidget,
                        !SharingStateManager.shared.preventNotchClose {
                         self.vm.close()
                     }
@@ -926,6 +928,15 @@ extension ContentView {
     // MARK: - Gesture Handling
 
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
+        // Noor custom: on the open home view, scrolling down (outside the
+        // calendar, which scrolls itself) pulls the notch down.
+        if vm.notchState == .open {
+            guard phase != .ended, coordinator.currentView == .home, Defaults[.showCalendar],
+                  !vm.isWidgetExpanded, !vm.isHoveringCalendar,
+                  translation > Defaults[.gestureSensitivity] / 2 else { return }
+            vm.setWidgetExpanded(true)
+            return
+        }
         guard vm.notchState == .closed else { return }
 
         if phase == .ended {
@@ -961,7 +972,7 @@ extension ContentView {
             }
         }
 
-        if translation > Defaults[.gestureSensitivity] && vm.isWidgetExpanded {
+        if translation > Defaults[.gestureSensitivity] / 2 && vm.isWidgetExpanded {
             // Expanded widget: scrolling up folds it back before it closes the notch.
             withAnimation(animationSpring) { gestureProgress = .zero }
             vm.setWidgetExpanded(false)
