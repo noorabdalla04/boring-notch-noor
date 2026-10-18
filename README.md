@@ -115,6 +115,19 @@ writes to Reminders when asked to. See the top of
 [`boringNotch/extensions/NoorLab.swift`](boringNotch/extensions/NoorLab.swift) for the
 commands.
 
+## Tests
+
+```bash
+xcodebuild -project boringNotch.xcodeproj -scheme boringNotch test \
+  CODE_SIGN_IDENTITY="-" CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="" ENABLE_HARDENED_RUNTIME=NO
+scripts/lab.sh build && scripts/lab-regression.sh
+```
+
+The unit tests (`boringNotchTests/WidgetsTests.swift` for this fork) cover the
+Pomodoro planner, prayer-time parsing, iqama pairing and calculation-method choice. The
+regression script drives the sandbox end to end: pulling down by drag, click and
+scroll, the pages, reminders, and the prayer-location flow.
+
 ## Where the code is
 
 | File | Feature |
