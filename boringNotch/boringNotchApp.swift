@@ -203,6 +203,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Hosting unit tests: don't start a second notch, shortcuts or windows.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            NSApp.setActivationPolicy(.prohibited)
+            return
+        }
+        // Hosting unit tests: don't start a second notch, shortcuts or windows.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            NSApp.setActivationPolicy(.prohibited)
+            return
+        }
         // Noor custom: the UI sandbox (NoorLab.swift) runs instead of the app.
         if NoorLab.isRequested {
             NoorLab.start(camera: camera)

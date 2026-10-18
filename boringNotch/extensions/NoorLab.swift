@@ -197,6 +197,8 @@ enum NoorLab {
     }
 
     private static func drag(from a: CGPoint, to b: CGPoint, steps: Int, release: Bool, in window: NSWindow) async {
+        // A real pointer always arrives before it presses.
+        await mouse(.mouseMoved, at: a, in: window)
         await mouse(.leftMouseDown, at: a, in: window)
         for i in 1...max(1, steps) {
             let t = Double(i) / Double(max(1, steps))
