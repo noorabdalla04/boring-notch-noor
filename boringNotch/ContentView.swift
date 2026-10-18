@@ -931,7 +931,7 @@ extension ContentView {
         // Noor custom: on the open home view, scrolling down (outside the
         // calendar, which scrolls itself) pulls the notch down.
         if vm.notchState == .open {
-            guard phase != .ended, coordinator.currentView == .home, Defaults[.showCalendar],
+            guard phase != .ended, coordinator.currentView == .home, Defaults[.showCalendar], HomeWidgetPage.canExpand,
                   !vm.isWidgetExpanded, !vm.isHoveringCalendar,
                   translation > Defaults[.gestureSensitivity] / 2 else { return }
             vm.setWidgetExpanded(true)

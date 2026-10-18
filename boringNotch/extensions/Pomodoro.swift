@@ -664,6 +664,8 @@ struct PomodoroCardView: View {
                 smallButton("forward.end.fill", help: "End this block now", enabled: pomodoro.isActive, action: pomodoro.skip)
             }
         }
+        // On its own (Prayers switched off) the card is wide; keep the controls compact.
+        .frame(maxWidth: 240)
         .frame(maxWidth: .infinity)
     }
 

@@ -2,16 +2,14 @@
 //  PrayerTimes.swift
 //  boringNotch
 //
-//  Noor custom: the Prayers page of the home widget pager. Times come from
-//  Noor's own calendars rather than a calculation method, so the notch always
-//  agrees with what the calendar says:
+//  Noor custom: the Prayers page of the home widget pager, and the Prayers card
+//  of the pulled-down notch. Adhan times come from PrayerSources.swift: a
+//  prayer-times calendar if there is one, otherwise times calculated for the
+//  location you pick (asked for the first time the widget is opened).
 //
-//  - adhan times: the prayer-times subscription, events titled exactly
-//    "Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"
-//  - iqama times: mosque events titled like "Isha at BIC · iqama 19:45"
-//
-//  Every calendar is read (not only the ones ticked for the calendar page),
-//  and duplicates of the same prayer collapse to one.
+//  - calendar adhan times: events titled exactly "Fajr", "Sunrise", "Dhuhr",
+//    "Asr", "Maghrib", "Isha" (every calendar is read; duplicates collapse)
+//  - iqama times, either way: events titled like "Isha at My Mosque · iqama 19:45"
 //
 
 import Defaults
@@ -52,7 +50,7 @@ enum PrayerParsing {
         options: [.caseInsensitive]
     )
 
-    /// "Isha at BIC · iqama 19:45" on a given day -> ("Isha", "BIC", 19:45 that day).
+    /// "Isha at My Mosque · iqama 19:45" on a given day -> ("Isha", "My Mosque", 19:45 that day).
     static func iqama(from title: String, on day: Date) -> (name: String, place: String, time: Date)? {
         let range = NSRange(title.startIndex..., in: title)
         guard let match = iqamaPattern.firstMatch(in: title, range: range),
@@ -65,6 +63,29 @@ enum PrayerParsing {
               let time = Calendar.current.date(bySettingHour: hour, minute: minute, second: 0, of: day)
         else { return nil }
         return (name, String(title[placeRange]), time)
+    }
+
+    /// An iqama belongs to an adhan only if it comes after it, within two hours:
+    /// a mosque's events can't be paired with times calculated for another city.
+    static func plausibleIqama(_ iqama: Date, after adhan: Date) -> Bool {
+        let gap = iqama.timeIntervalSince(adhan)
+        return gap >= 0 && gap <= 2 * 3600
+    }
+
+    /// Adds iqama times from that day's mosque events to prayers from another source.
+    static func withIqama(_ prayers: [PrayerTime], from events: [EventModel], on day: Date) -> [PrayerTime] {
+        // A new user in the UI sandbox has no mosque of their own.
+        if UserDefaults.standard.bool(forKey: "NoorLabFreshPrayer") { return prayers }
+        let calendar = Calendar.current
+        var result = prayers
+        for event in events where calendar.isDate(event.start, inSameDayAs: day) && !event.isAllDay {
+            guard let found = iqama(from: event.title, on: event.start),
+                  let index = result.firstIndex(where: { $0.name == found.name && $0.iqama == nil }),
+                  Self.plausibleIqama(found.time, after: result[index].time) else { continue }
+            result[index].iqama = found.time
+            result[index].place = found.place
+        }
+        return result
     }
 
     /// One day's prayers, in order, from that day's events.
@@ -82,7 +103,8 @@ enum PrayerParsing {
         }
         for event in dayEvents {
             guard let found = iqama(from: event.title, on: event.start),
-                  var entry = byName[found.name], entry.prayer.iqama == nil else { continue }
+                  var entry = byName[found.name], entry.prayer.iqama == nil,
+                  plausibleIqama(found.time, after: entry.prayer.time) else { continue }
             entry.prayer.iqama = found.time
             entry.prayer.place = found.place
             byName[found.name] = entry
@@ -98,6 +120,12 @@ final class PrayerTimesManager: ObservableObject {
     @Published private(set) var today: [PrayerTime] = []
     @Published private(set) var tomorrow: [PrayerTime] = []
     @Published private(set) var loadedDay: Date?
+    /// No prayer-times calendar and no location yet: the widget asks for one.
+    @Published private(set) var needsLocation = false
+    /// The source the times on screen came from.
+    @Published private(set) var activeSource: PrayerSource = .automatic
+    /// Calculated times couldn't be fetched (offline on a new month, say).
+    @Published private(set) var fetchFailed = false
 
     private let service = CalendarService()
     private var observer: NSObjectProtocol?
@@ -121,8 +149,38 @@ final class PrayerTimesManager: ObservableObject {
                   let end = calendar.date(byAdding: .day, value: 2, to: start) else { return }
             let events = await service.events(from: start, to: end, calendars: [])
             guard !Task.isCancelled else { return }
-            today = PrayerParsing.prayers(from: events, on: start)
-            tomorrow = PrayerParsing.prayers(from: events, on: tomorrowStart)
+            let fromCalendar = (PrayerParsing.prayers(from: events, on: start), PrayerParsing.prayers(from: events, on: tomorrowStart))
+
+            var source = Defaults[.prayerSource]
+            if source == .automatic {
+                source = fromCalendar.0.count >= 5 ? .calendar : .calculated
+            }
+            activeSource = source
+
+            switch source {
+            case .calendar, .automatic:
+                today = fromCalendar.0
+                tomorrow = fromCalendar.1
+                needsLocation = false
+                fetchFailed = false
+            case .calculated:
+                guard PrayerLocationStore.current != nil else {
+                    needsLocation = true
+                    today = []
+                    tomorrow = []
+                    loadedDay = start
+                    return
+                }
+                needsLocation = false
+                let calculated = (await CalculatedPrayerTimes.prayers(on: start), await CalculatedPrayerTimes.prayers(on: tomorrowStart))
+                guard !Task.isCancelled else { return }
+                fetchFailed = calculated.0 == nil
+                // Iqama times still come from mosque events on the calendar, unless
+                // the location is somewhere else entirely.
+                let local = PrayerLocationStore.current.flatMap { TimeZone(identifier: $0.timeZone) }?.secondsFromGMT() == TimeZone.current.secondsFromGMT()
+                today = local ? PrayerParsing.withIqama(calculated.0 ?? [], from: events, on: start) : (calculated.0 ?? [])
+                tomorrow = local ? PrayerParsing.withIqama(calculated.1 ?? [], from: events, on: tomorrowStart) : (calculated.1 ?? [])
+            }
             loadedDay = start
         }
     }
@@ -167,8 +225,10 @@ struct PrayerTimesPageView: View {
         VStack(alignment: .leading, spacing: 3) {
             header(next: next, now: now, tomorrow: showingTomorrow)
 
-            if list.isEmpty {
-                Text(prayers.loadedDay == nil ? "Loading…" : "No prayer times in your calendars for today.")
+            if prayers.needsLocation {
+                PrayerLocationPrompt()
+            } else if list.isEmpty {
+                Text(PrayerTimesPageView.emptyMessage(prayers))
                     .font(.system(size: 11))
                     .foregroundStyle(.gray)
                     .multilineTextAlignment(.center)
@@ -237,8 +297,20 @@ struct PrayerTimesPageView: View {
         .opacity(prayer.isPrayer ? 1 : 0.7)
     }
 
+    @MainActor
+    static func emptyMessage(_ prayers: PrayerTimesManager) -> String {
+        if prayers.loadedDay == nil { return "Loading…" }
+        if prayers.fetchFailed { return "Couldn't load prayer times. Check your connection." }
+        return prayers.activeSource == .calendar
+            ? "No prayer times in your calendars today."
+            : "No prayer times for today."
+    }
+
+    @MainActor
     static func clock(_ date: Date) -> String {
-        date.formatted(date: .omitted, time: .shortened)
+        var style = Date.FormatStyle(date: .omitted, time: .shortened)
+        style.timeZone = PrayerDisplay.timeZone
+        return date.formatted(style)
     }
 
     static func until(_ date: Date, from now: Date) -> String {
@@ -280,15 +352,21 @@ struct PrayerCardView: View {
                 }
             }
 
-            if list.isEmpty {
-                Text(prayers.loadedDay == nil ? "Loading…" : "No prayer times today.")
+            if prayers.needsLocation {
+                PrayerLocationPrompt(roomy: true)
+            } else if list.isEmpty {
+                Text(PrayerTimesPageView.emptyMessage(prayers))
                     .font(.system(size: 11))
                     .foregroundStyle(.gray)
             } else {
                 VStack(spacing: 1) {
                     HStack(spacing: 4) {
                         Spacer()
-                        Text("iqama").frame(width: 30, alignment: .trailing)
+                        if list.contains(where: { $0.iqama != nil }) {
+                            Text("iqama").frame(width: 30, alignment: .trailing)
+                        } else {
+                            Color.clear.frame(width: 30, height: 1)
+                        }
                         Text("adhan").frame(width: 38, alignment: .trailing)
                     }
                     .font(.system(size: 8.5, weight: .medium))
@@ -334,8 +412,10 @@ struct PrayerCardView: View {
     }
 
     /// "6:00", "12:48": the card is narrow, and which half of the day is obvious.
+    @MainActor
     static func short(_ date: Date) -> String {
-        shortFormatter.string(from: date)
+        shortFormatter.timeZone = PrayerDisplay.timeZone
+        return shortFormatter.string(from: date)
     }
 
     private static let shortFormatter: DateFormatter = {

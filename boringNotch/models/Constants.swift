@@ -453,7 +453,11 @@ extension Defaults.Keys {
     static let showCalendar = Key<Bool>("showCalendar", default: false)
     static let hideCompletedReminders = Key<Bool>("hideCompletedReminders", default: true)
     /// Checkboxes on FlowSavvy / FlowLocal task blocks (TaskBlocks.swift).
-    static let taskBlockCheckboxes = Key<Bool>("taskBlockCheckboxes", default: true)
+    /// Optional FlowSavvy / FlowLocal integration (extensions/TaskBlocks.swift). Off by
+    /// default so the calendar is a plain Apple calendar; switched on automatically
+    /// once, at launch, if a FlowSavvy key or a FlowLocal install is found.
+    static let taskBlockCheckboxes = Key<Bool>("taskBlockCheckboxes", default: false)
+    static let taskBlockAutoDetected = Key<Bool>("taskBlockAutoDetected", default: false)
 
     // MARK: Pomodoro (Noor custom; see extensions/Pomodoro.swift)
     /// The focus length the planner aims for; blocks stretch or shrink around it to land on prayer.
@@ -466,6 +470,18 @@ extension Defaults.Keys {
     static let pomodoroAutoStartNext = Key<Bool>("pomodoroAutoStartNext", default: true)
     static let pomodoroSound = Key<Bool>("pomodoroSound", default: true)
     static let pomodoroClosedNotchTimer = Key<Bool>("pomodoroClosedNotchTimer", default: true)
+    // MARK: Home widgets (extensions/HomeWidgets.swift); the calendar is always there
+    static let showRemindersWidget = Key<Bool>("showRemindersWidget", default: true)
+    static let showPrayersWidget = Key<Bool>("showPrayersWidget", default: true)
+    static let showPomodoroWidget = Key<Bool>("showPomodoroWidget", default: true)
+
+    // MARK: Prayer times (extensions/PrayerSources.swift)
+    static let prayerSource = Key<PrayerSource>("prayerSource", default: .automatic)
+    static let prayerLocation = Key<PrayerLocation?>("prayerLocation", default: nil)
+    /// AlAdhan method id; -1 follows the location's country.
+    static let prayerMethod = Key<Int>("prayerMethod", default: -1)
+    /// Asr: 0 standard (Shafi'i, Maliki, Hanbali), 1 Hanafi.
+    static let prayerSchool = Key<Int>("prayerSchool", default: 0)
     /// Reminders widget (extensions/RemindersWidget.swift): include reminders with no due date.
     static let remindersShowUndated = Key<Bool>("remindersShowUndated", default: true)
     static let sliderColor = Key<SliderColorEnum>(

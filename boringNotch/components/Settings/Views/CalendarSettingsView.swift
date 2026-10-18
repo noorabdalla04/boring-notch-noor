@@ -61,21 +61,18 @@ struct CalendarSettings: View {
             }
 
             Section {
-                Defaults.Toggle(key: .taskBlockCheckboxes) {
-                    Text("Checkboxes on FlowSavvy & FlowLocal blocks")
-                }
-                FlowSavvyKeyField()
-                HStack {
-                    Text("FlowLocal")
-                    Spacer()
-                    Text(FlowLocalKey.read() != nil ? "Connected (key found)" : "Not set up on this Mac")
-                        .foregroundStyle(.secondary)
-                }
+                Defaults.Toggle(key: .showRemindersWidget) { Text("Reminders") }
+                Defaults.Toggle(key: .showPrayersWidget) { Text("Prayer times") }
+                Defaults.Toggle(key: .showPomodoroWidget) { Text("Pomodoro") }
             } header: {
-                Text("Task blocks")
+                Text("Notch widgets")
             } footer: {
-                Text("Ticking a block marks that sitting done: its time counts toward the task and the rest re-plans. Ticking a task's only or last block completes it.")
+                Text("Pages you can swipe to next to the calendar. Pull the open notch down (drag the strip at its bottom edge, or scroll down) to see Pomodoro and prayer times as cards under the music player.")
             }
+
+            TaskBlockSettingsSection()
+
+            PrayerSettingsSection()
 
             PomodoroSettingsSection()
 
@@ -218,10 +215,10 @@ func lighterColor(from nsColor: NSColor, amount: CGFloat = 0.14) -> Color {
     return Color(red: Double(nr), green: Double(ng), blue: Double(nb), opacity: Double(a))
 }
 
-/// FlowSavvy API key, kept in the Keychain. The field never shows the saved key.
+/// FlowSavvy API key, kept in the app's private storage. The field never shows the saved key.
 private struct FlowSavvyKeyField: View {
     @State private var draft = ""
-    @State private var isSaved = FlowSavvyKeychain.read() != nil
+    @State private var isSaved = FlowSavvyKeychain.exists
 
     var body: some View {
         HStack {
@@ -232,6 +229,7 @@ private struct FlowSavvyKeyField: View {
             )
             Button("Save") {
                 isSaved = FlowSavvyKeychain.save(draft)
+                if isSaved { Defaults[.taskBlockCheckboxes] = true }
                 draft = ""
             }
             .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -274,6 +272,33 @@ struct PomodoroSettingsSection: View {
             Text("Pomodoro")
         } footer: {
             Text("Starting a focus run splits the time until the next adhan into blocks as close to the ideal as possible, so the last one ends when it's time to pray. Adhan times come from your prayer times calendar. After a prayer break, start the next run yourself.")
+        }
+    }
+}
+
+/// Optional: FlowSavvy / FlowLocal auto-scheduler integration (extensions/TaskBlocks.swift).
+/// Off, the calendar is a plain Apple calendar and nothing talks to either service.
+struct TaskBlockSettingsSection: View {
+    @Default(.taskBlockCheckboxes) private var enabled
+
+    var body: some View {
+        Section {
+            Toggle("Tick off FlowSavvy / FlowLocal task blocks", isOn: $enabled)
+            if enabled {
+                FlowSavvyKeyField()
+                HStack {
+                    Text("FlowLocal")
+                    Spacer()
+                    Text(FlowLocalKey.read() != nil ? "Connected (key found)" : "Not set up on this Mac")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Auto-scheduler integration (optional)")
+        } footer: {
+            Text(enabled
+                 ? "Task blocks that FlowSavvy or FlowLocal put on your calendar get a checkbox. Ticking one marks that sitting done: its time counts toward the task and the rest re-plans; ticking a task's only or last block completes it."
+                 : "Off: the calendar shows your Apple Calendar as it is. Turn this on only if you use the FlowSavvy or FlowLocal auto-schedulers.")
         }
     }
 }

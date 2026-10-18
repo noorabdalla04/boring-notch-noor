@@ -6,7 +6,7 @@
 //  notch or Noor's screen.
 //
 //  Launched as a second process with `-NoorLab YES -menubarIcon NO` (see
-//  noor-lab.sh), the app skips its normal start-up and instead hosts one
+//  scripts/lab.sh), the app skips its normal start-up and instead hosts one
 //  ContentView, open, in a window kept behind the desktop picture: drawn and
 //  capturable, never visible, never in the way of the mouse. Commands arrive as
 //  the distributed notification "noor.lab" (the command is the object string):
@@ -38,6 +38,9 @@ import SwiftUI
 @MainActor
 enum NoorLab {
     nonisolated static var isRequested: Bool { UserDefaults.standard.bool(forKey: "NoorLab") }
+    /// `-NoorLabLive YES`: the lab writes to the real Reminders (to test the real
+    /// save path on this Mac). Without it, every write is simulated.
+    nonisolated static var simulatesWrites: Bool { isRequested && !UserDefaults.standard.bool(forKey: "NoorLabLive") }
 
     private static var window: NSWindow?
     private static var vm: BoringViewModel?
@@ -143,10 +146,29 @@ enum NoorLab {
             await scroll(at: CGPoint(x: n[0], y: n[1]), dy: n[2], steps: Int(n.count > 3 ? n[3] : 10), in: window)
         case "state": log("state " + state(vm))
         case "reminders": log("reminders " + RemindersManager.shared.stats())
+        case "prayers":
+            let m = PrayerTimesManager.shared
+            let f = DateFormatter(); f.dateFormat = "HH:mm"
+            let list = m.today.map { "\($0.name) \(f.string(from: $0.time))" + ($0.iqama.map { " iq \(f.string(from: $0))" } ?? "") }
+            log("prayers source=\(m.activeSource.rawValue) needsLocation=\(m.needsLocation) failed=\(m.fetchFailed) today=[\(list.joined(separator: ", "))]")
+        case "prayer-search":
+            NotificationCenter.default.post(name: .noorLabPrayerSearch, object: parts.dropFirst().joined(separator: " "))
+        case "prayer-pick" where n.count >= 1:
+            NotificationCenter.default.post(name: .noorLabPrayerPick, object: Int(n[0]))
+        case "prayer-refresh":
+            PrayerTimesManager.shared.refresh()
         case "tick" where n.count >= 1:
             // Tick the Nth reminder as listed (simulated in the lab: nothing is saved).
             let flat = RemindersManager.shared.sections().flatMap { $0.1 }
             if flat.indices.contains(Int(n[0])) { RemindersManager.shared.toggle(flat[Int(n[0])]) }
+        case "reminder-status":
+            let title = parts.dropFirst().joined(separator: " ")
+            log("reminders status \(title): " + (await RemindersManager.shared.status(ofTitle: title)))
+        case "tick-title":
+            let title = parts.dropFirst().joined(separator: " ")
+            if let item = RemindersManager.shared.items.first(where: { $0.title == title }) {
+                RemindersManager.shared.toggle(item)
+            } else { log("unknown reminder") }
         case "add":
             let text = parts.dropFirst().joined(separator: " ")
             NotificationCenter.default.post(name: .noorLabAddReminder, object: text)
@@ -240,6 +262,7 @@ enum NoorLab {
             "windowHeight": Double(window?.frame.height ?? 0),
             "page": HomeWidgetState.shared.page.rawValue,
             "hoveringCalendar": vm.isHoveringCalendar,
+            "taskBlocks": Defaults[.taskBlockCheckboxes],
             "pomodoro": PomodoroManager.shared.isRunning ? "running" : (PomodoroManager.shared.isPaused ? "paused" : "idle"),
         ]
         let data = (try? JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])) ?? Data()

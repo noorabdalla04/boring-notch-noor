@@ -1,205 +1,135 @@
-<h1 align="center">
-  <br>
-  <a href="http://theboring.name"><img src="https://framerusercontent.com/images/RFK4vs0kn8pRMuOO58JeyoemXA.png?scale-down-to=256" alt="Boring Notch" width="150"></a>
-  <br>
-  Boring Notch
-  <br>
-</h1>
+# Boring Notch — widgets edition
 
+A fork of [Boring Notch](https://github.com/TheBoredTeam/boring.notch) that turns the
+open notch into a small dashboard: **calendar, reminders, prayer times and a
+prayer-aware Pomodoro timer**, side by side with the music player you already know.
 
-<p align="center">
-  <a title="Crowdin" target="_blank" href="https://crowdin.com/project/boring-notch"><img src="https://badges.crowdin.net/boring-notch/localized.svg"></a>
-  <img src="https://github.com/TheBoredTeam/boring.notch/actions/workflows/cicd.yml/badge.svg" alt="TheBoringNotch Build & Test" style="margin-right: 10px;" />
-  <a href="https://discord.gg/c8JXA7qrPm">
-    <img src="https://dcbadge.limes.pink/api/server/https://discord.gg/c8JXA7qrPm?style=flat" alt="Discord Badge" />
-  </a>
-  <a href="https://www.ko-fi.com/alexander5015">
-    <img src="https://srv-cdn.himpfen.io/badges/kofi/kofi-flat.svg" alt="Ko-Fi" />
-  </a>
-</p>
+It installs next to the official app (its own bundle id, settings and permissions),
+so you can try it without giving anything up.
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/14815?utm_source=repository-badge&amp;utm_medium=badge&amp;utm_campaign=badge-repository-14815" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/repositories/14815" alt="TheBoredTeam%2Fboring.notch |    Trendshift" width="250" height="55"/></a>
-</p>
-<!--Welcome to **Boring.Notch**, the coolest way to make your MacBook's notch the star of the show! Forget about those boring status bars—our notch turns into a dynamic music control center, complete with a snazzy visualizer and all the music controls you need. It's like having a mini concert right at the top of your screen! -->
-
-Say hello to **Boring Notch**, the coolest way to make your MacBook’s notch the star of the show! Say goodbye to boring status bars: with Boring Notch, your notch transforms into a dynamic music control center, complete with a vibrant visualizer and all the essential music controls you need. But that’s just the start! Boring Notch also offers calendar integration, a handy file shelf with sharing support, a complete MacOS OSD replacement and more!
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/2d5f69c1-6e7b-4bc2-a6f1-bb9e27cf88a8" alt="Demo GIF" />
+  <img src="docs/images/pulled-down-cards.png" width="480" alt="Pomodoro and prayer-time cards in the pulled-down notch">
 </p>
 
-<!--https://github.com/user-attachments/assets/19b87973-4b3a-4853-b532-7e82d1d6b040-->
----
-<!--## Table of Contents
-- [Installation](#installation)
-- [Usage](#usage)
-- [Roadmap](#-roadmap)
-- [Building from Source](#building-from-source)
-- [Contributing](#-contributing)
-- [Join our Discord Server](#join-our-discord-server)
-- [Star History](#star-history)
-- [Buy us a coffee!](#buy-us-a-coffee)
-- [Acknowledgments](#-acknowledgments)-->
+## What it adds
 
-## Installation
+### Swipeable widgets
+The right side of the open notch is a pager: **Calendar · Reminders · Prayers ·
+Pomodoro**. Swipe sideways with two fingers or click the dots. Every open starts on
+the calendar. Each extra page can be switched off in Settings.
 
-**System Requirements:**
-- macOS **14 Sonoma** or later
-- Apple Silicon or Intel Mac
+### Pull the notch down
+Drag the strip along the bottom edge of the open notch (or click it, or scroll down
+over the music side) and the notch grows to about twice its height. The music player
+stays where it is, Pomodoro and prayer-time cards appear under it, and the calendar
+(or reminders) runs the full height on the right. Drag up, click, scroll up or close
+the notch to fold it back.
 
----
+### Reminders
+Incomplete reminders from the lists you pick, grouped as **Late**, **Today**, **Next
+7 days** and **No date**, with list colours, priorities and due times. Tick one off
+(with a moment to undo), click a title to open it in Reminders, or press **+** to add
+one due today without leaving the notch.
 
-### Option 1: Download and Install Manually
+### Prayer times
+<p>
+  <img src="docs/images/prayer-location-prompt.png" width="300" alt="Choosing a city for prayer times">
+  <img src="docs/images/prayers-page.png" width="300" alt="Prayer times page">
+</p>
 
-<a href="https://github.com/TheBoredTeam/boring.notch/releases/latest/download/Boring%20Notch.dmg" target="_self"><img width="200" src="https://github.com/user-attachments/assets/e3179be1-8416-4b8a-b417-743e1ecc67d6" alt="Download for macOS" /></a>
+The first time you open the Prayers page it asks for your city, then shows the day's
+times with a countdown to the next prayer. Times are calculated by the free
+[AlAdhan API](https://aladhan.com/prayer-times-api) with the method most mosques in
+your country use (ISNA in North America, Umm al-Qura in Saudi Arabia, Diyanet in
+Türkiye, and so on); you can choose another method and the Hanafi Asr in Settings.
+A month is fetched at a time and cached, so it keeps working offline.
 
-1. Open the downloaded `Boring Notch.dmg` file.
-2. Drag **Boring Notch** onto the **Applications** folder in the installer window.
-3. Wait for the copy to finish.
-4. Eject the Boring Notch disk image in Finder.
-5. Open **Boring Notch** from your **Applications** folder.
+Prefer your mosque's own timetable? Subscribe to a prayer-times calendar whose events
+are named Fajr, Sunrise, Dhuhr, Asr, Maghrib and Isha (for example from
+[prayerwebcal.dsultan.com](https://prayerwebcal.dsultan.com)); the widget uses it
+automatically. Calendar events like `Isha at My Mosque · iqama 19:45` add iqama times.
 
-The installed app stays available after you eject the disk image. Opening the app inside the installer does not install it.
+### Prayer-aware Pomodoro
+<img src="docs/images/pomodoro-page.png" width="300" alt="Pomodoro page">
 
-> [!IMPORTANT]
-> Release builds are not notarized with Apple (macOS will warn you that Boring Notch is from an unidentified developer on first launch). This is expected behavior.
->
-> You'll need to bypass this before the app will open. You only need to do this once. Use one of the methods below.
+Press Start and the time until the next adhan is split into focus blocks as close to
+your ideal length (60 minutes by default) as possible, with short breaks between them,
+so the last block ends exactly when it's time to pray. Two and a half hours before
+Asr becomes 2 × 70 minutes rather than 3 × 43. The plan is redone at every block, so
+a late start or a long break just reshapes what's left. While a block runs, the closed
+notch shows a small ring and the time remaining.
 
----
+### Optional: FlowSavvy / FlowLocal
+If you use the [FlowSavvy](https://flowsavvy.app) auto-scheduler (or FlowLocal), task
+blocks on your calendar can get a checkbox: ticking one credits that sitting's time to
+the task and lets the rest re-plan. This is **off unless you set it up** — it turns
+itself on only if it finds a FlowSavvy key or a FlowLocal install — and with it off
+the calendar is a plain Apple calendar. Settings › Calendar › Auto-scheduler
+integration.
 
-#### Recommended: Terminal (Always Works)
+## Install
 
-This is the quickest and easiest method. It only requires a single command and works consistently for all users. System Settings can sometimes fail and won't work for non-admin users.
-
-After moving Boring Notch to your Applications folder, run:
+Requirements: macOS 15.6 or later, Xcode 26 or later.
 
 ```bash
-xattr -dr com.apple.quarantine "/Applications/Boring Notch.app"
+git clone <this repository>
+cd boring.notch
+scripts/build-and-install.sh
 ```
 
-Then open the app normally.
+This builds the app, installs it as `/Applications/Boring Notch (Custom).app` and
+launches it. On first launch macOS asks for Calendar and Reminders access.
 
----
+By default the build is signed ad hoc, so macOS asks for those permissions again after
+every rebuild. To avoid that, create a local code-signing certificate and list it in
+`~/.config/boring-notch/signing.env`; the top of
+[`scripts/build-and-install.sh`](scripts/build-and-install.sh) explains how.
 
-#### Alternative: System Settings
+## Settings
 
-> [!NOTE]
-> This method doesn't work for all users. If this doesn't work, use the Terminal method above.
+Everything new lives in **Settings › Calendar**:
 
-1. Try to open the app — you'll see a security warning.
-2. Click **OK** to dismiss it.
-3. Open **System Settings** > **Privacy & Security**.
-4. Scroll to the bottom and click **Open Anyway** next to the Boring Notch warning.
-5. Confirm if prompted.
+| Section | What it controls |
+|---|---|
+| Notch widgets | Show or hide the Reminders, Prayer times and Pomodoro pages |
+| Prayer times | Source (automatic, calculated, calendar), city, calculation method, Asr |
+| Pomodoro | Ideal block, short break, prayer break, align with prayers, sound |
+| Reminders widget | Include reminders without a due date |
+| Auto-scheduler integration | FlowSavvy key, FlowLocal status (optional) |
 
----
+## Privacy
 
-### Option 2: Install via Homebrew
+- Calendar and Reminders data stay on your Mac.
+- Prayer times: your chosen city's coordinates are sent to api.aladhan.com once a
+  month; the city search uses Apple Maps. Nothing is sent if you use a calendar
+  instead.
+- The FlowSavvy key, if you add one, is stored in the app's own sandbox container
+  (readable only by the app and you) and only sent to my.flowsavvy.app.
 
-You can also install using [Homebrew](https://brew.sh). The Homebrew installation automatically bypasses the macOS security warning described above.
+## Working on the UI
 
-```bash
-brew install --cask TheBoredTeam/boring-notch/boring-notch
-```
+`scripts/lab.sh` runs a hidden copy of the notch in a window behind the desktop
+picture, driven by synthetic clicks, drags, scrolls and typing and captured with
+`screencapture`. It never touches the real notch, never saves Pomodoro state and only
+writes to Reminders when asked to. See the top of
+[`boringNotch/extensions/NoorLab.swift`](boringNotch/extensions/NoorLab.swift) for the
+commands.
 
-## Usage
+## Where the code is
 
-- Launch the app, and voilà—your notch is now the coolest part of your screen.
-- Hover over the notch to see it expand and reveal all its secrets.
-- Use the controls to manage your music like a rockstar.
-- Click the star in your menu bar to customize your notch to your heart's content.
+| File | Feature |
+|---|---|
+| `extensions/HomeWidgets.swift` | Pager, pull-down, expanded cards |
+| `extensions/RemindersWidget.swift` | Reminders page |
+| `extensions/PrayerTimes.swift` | Prayer page and card, calendar parsing |
+| `extensions/PrayerSources.swift` | AlAdhan times, city search, prayer settings |
+| `extensions/Pomodoro.swift` | Pomodoro planner, pages and closed-notch timer |
+| `extensions/TaskBlocks.swift` | Optional FlowSavvy / FlowLocal checkboxes |
+| `extensions/NoorLab.swift` | UI sandbox |
 
-## 📋 Roadmap
-- [x] Playback live activity 🎧
-- [x] Calendar integration 📆
-- [x] Reminders integration ☑️
-- [x] Mirror 📷
-- [x] Charging indicator and current percentage 🔋
-- [x] Customizable gesture control 👆🏻
-- [x] Shelf functionality with AirDrop 📚
-- [x] Notch sizing customization, finetuning on different display sizes 🖥️
-- [x] System OSD replacements (volume, brightness, backlight) 🎚️💡⌨️
-- [ ] Bluetooth Live Activity (connect/disconnect for bluetooth devices) 
-- [ ] Weather integration ⛅️
-- [ ] Customizable Layout options 🛠️
-- [ ] Lock Screen Widgets 🔒
-- [ ] Extension system 🧩
-- [ ] Notifications (under consideration) 🔔
-<!-- - [ ] Clipboard history manager 📌 `Extension` -->
-<!-- - [ ] Download indicator of different browsers (Safari, Chromium browsers, Firefox) 🌍 `Extension`-->
-<!-- - [ ] Customizable function buttons 🎛️ -->
-<!-- - [ ] App switcher 🪄 -->
+## Credits and licence
 
-<!-- ## 🧩 Extensions
-> [!NOTE]
-> We’re hard at work on some awesome extensions! Stay tuned, and we’ll keep you updated as soon as they’re released. -->
-
-## Building from Source
-
-### Prerequisites
-
-- **macOS 15.6 or later**
-- **Xcode 26 or later**
-
-### Installation
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/TheBoredTeam/boring.notch.git
-   cd boring.notch
-   ```
-
-2. **Open the Project in Xcode**:
-   ```bash
-   open boringNotch.xcodeproj
-   ```
-
-3. **Build and Run**:
-    - Click the "Run" button or press `Cmd + R`. Watch the magic unfold!
-
-## 🤝 Contributing
-
-We’re all about good vibes and awesome contributions! Read [CONTRIBUTING.md](CONTRIBUTING.md) to learn how you can join the fun!
-
-## Join our Discord Server
-
-<a href="https://discord.gg/GvYcYpAKTu" target="_blank"><img src="https://iili.io/28m3GHv.png" alt="Join The Boring Server!" style="height: 60px !important;width: 217px !important;" ></a>
-
-## Star History
-<!-- BROKEN: GitHub now restricts the stargazer API for privacy reasons
-<a href="https://www.star-history.com/#TheBoredTeam/boring.notch&Timeline">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=TheBoredTeam/boring.notch&type=Timeline" />
- </picture>
-</a>
--->
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-dark.svg">
-   <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-light.svg">
-   <img src="https://raw.githubusercontent.com/TheBoredTeam/org-star-chart-updater/main/projects/boring.notch/chart-light.svg" alt="TheBoredTeam/boring.notch GitHub star history">
- </picture>
-
-## Support us on Ko-fi!
-<!-- <a href="https://www.buymeacoffee.com/jfxh67wvfxq" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-red.png" alt="Buy Me A Coffee" style="height: 60px !important;width: 217px !important;" ></a> -->
-<a href="https://www.ko-fi.com/alexander5015" target="_blank"><img src="https://github.com/user-attachments/assets//a76175ef-7e93-475a-8b67-4922ba5964c2" alt="Support us on Ko-fi" style="height: 70px !important;width: 346px !important;" ></a>
-
-## 🎉 Acknowledgments
-
-We would like to express our gratitude to the authors and maintainers of the open-source projects that made this possible. 
-
-## Notable Projects
-- **[MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter)** –  An open-source project that allowed us to use the Now Playing source in macOS 15.4+
-- **[NotchDrop](https://github.com/Lakr233/NotchDrop)** – An open-source project that has been instrumental in developing the first version of the "Shelf" feature in Boring Notch.
-
-For a full list of licenses and attributions, please see the [Third-Party Licenses](./THIRD_PARTY_LICENSES) file.
-
-### Icon credits: [@maxtron95](https://github.com/maxtron95)
-### Website credits: [@himanshhhhuv](https://github.com/himanshhhhuv)
-
-- **SwiftUI**: For making us look like coding wizards.
-- **You**: For being awesome and checking out **boring.notch**!
-
+Built on [Boring Notch](https://github.com/TheBoredTeam/boring.notch) by TheBoredTeam
+(its original README is in [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)).
+Prayer times by the [AlAdhan API](https://aladhan.com). Like the original, this fork
+is licensed under the [GNU GPL v3](LICENSE).

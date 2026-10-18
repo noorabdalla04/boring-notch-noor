@@ -210,6 +210,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         SettingsWindowController.shared.setCamera(camera)
         migrateDisplayModeIfNeeded()
+        TaskBlockIntegration.autoEnableIfConfigured()   // optional FlowSavvy/FlowLocal
 
         NotificationCenter.default.addObserver(
             self,

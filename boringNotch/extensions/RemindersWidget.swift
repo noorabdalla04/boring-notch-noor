@@ -90,7 +90,7 @@ final class RemindersManager: ObservableObject {
             let mapped = (reminders ?? []).map(Self.item(from:))
             Task { @MainActor in
                 // Keep lab-only additions (ids starting "lab-") across refreshes.
-                let labOnly = NoorLab.isRequested ? self.items.filter { $0.id.hasPrefix("lab-") } : []
+                let labOnly = NoorLab.simulatesWrites ? self.items.filter { $0.id.hasPrefix("lab-") } : []
                 self.items = mapped + labOnly
                 self.loaded = true
             }
@@ -184,7 +184,7 @@ final class RemindersManager: ObservableObject {
 
     private func complete(_ id: String) {
         commitTasks[id] = nil
-        if !NoorLab.isRequested, !id.hasPrefix("lab-"),
+        if !NoorLab.simulatesWrites, !id.hasPrefix("lab-"),
            let reminder = store.calendarItem(withIdentifier: id) as? EKReminder {
             reminder.isCompleted = true
             do { try store.save(reminder, commit: true) } catch { NSLog("Reminder completion failed: \(error)") }
@@ -200,7 +200,7 @@ final class RemindersManager: ObservableObject {
         let text = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         let today = Calendar.current.dateComponents([.year, .month, .day], from: .now)
-        if NoorLab.isRequested {
+        if NoorLab.simulatesWrites {
             withAnimation(.smooth(duration: 0.25)) {
                 items.append(ReminderItem(id: "lab-\(UUID().uuidString)", title: text,
                                           due: Calendar.current.date(from: today), dueHasTime: false,
@@ -226,6 +226,20 @@ final class RemindersManager: ObservableObject {
               let id = item.id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
               let url = URL(string: "x-apple-reminderkit://remcdreminder/\(id)") else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    /// Lab: does a reminder with this exact title exist, and is it completed?
+    func status(ofTitle title: String) async -> String {
+        guard hasAccess else { return "no access" }
+        let predicate = store.predicateForReminders(in: nil)
+        return await withCheckedContinuation { continuation in
+            store.fetchReminders(matching: predicate) { reminders in
+                let matches = (reminders ?? []).filter { $0.title == title }
+                let text = matches.isEmpty ? "not found"
+                    : matches.map { "list=\($0.calendar?.title ?? "?") completed=\($0.isCompleted) due=\($0.dueDateComponents?.day.map(String.init) ?? "-")" }.joined(separator: "; ")
+                continuation.resume(returning: text)
+            }
+        }
     }
 
     /// Section counts for the lab log (counts only, no titles).

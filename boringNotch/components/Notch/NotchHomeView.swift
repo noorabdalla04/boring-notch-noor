@@ -623,7 +623,7 @@ struct NotchHomeView: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         .overlay(alignment: .bottom) {
-            if widgets && vm.notchState == .open {
+            if widgets && HomeWidgetPage.canExpand && vm.notchState == .open {
                 // The pull strip sits in the panel's bottom padding, clear of the
                 // music controls.
                 WidgetExpandGrabber()

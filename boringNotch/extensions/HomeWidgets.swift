@@ -30,9 +30,25 @@ enum HomeWidgetPage: Int, CaseIterable, Identifiable {
 
     var id: Int { rawValue }
 
+    /// The pages switched on in Settings (the calendar always is).
+    static var enabled: [HomeWidgetPage] {
+        allCases.filter { page in
+            switch page {
+            case .calendar: true
+            case .reminders: Defaults[.showRemindersWidget]
+            case .prayers: Defaults[.showPrayersWidget]
+            case .pomodoro: Defaults[.showPomodoroWidget]
+            }
+        }
+    }
+
     /// The pages offered in the pulled-down notch's right column; Prayers and
-    /// Pomodoro are already on the left there.
-    static let expandedPages: [HomeWidgetPage] = [.calendar, .reminders]
+    /// Pomodoro are cards on the left there.
+    static var expandedPages: [HomeWidgetPage] { enabled.filter { $0 == .calendar || $0 == .reminders } }
+
+    /// Pulling the notch down reveals the Pomodoro / Prayers cards; with both
+    /// switched off there's nothing to pull down to.
+    static var canExpand: Bool { Defaults[.showPrayersWidget] || Defaults[.showPomodoroWidget] }
 
     var title: String {
         switch self {
@@ -71,7 +87,7 @@ final class HomeWidgetState: ObservableObject {
         }
     }
 
-    func move(by delta: Int, within pages: [HomeWidgetPage] = HomeWidgetPage.allCases) {
+    func move(by delta: Int, within pages: [HomeWidgetPage] = HomeWidgetPage.enabled) {
         let index = pages.firstIndex(of: page) ?? 0
         let next = index + delta
         if pages.indices.contains(next) { go(to: pages[next]) }
@@ -89,6 +105,10 @@ private final class PagerSwipeState {
 struct HomeWidgetPager: View {
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject private var state = HomeWidgetState.shared
+    // Observed so switching a page off in Settings updates the pager at once.
+    @Default(.showRemindersWidget) private var showReminders
+    @Default(.showPrayersWidget) private var showPrayers
+    @Default(.showPomodoroWidget) private var showPomodoro
 
     @State private var isHovering = false
     @State private var monitor: Any?
@@ -102,7 +122,7 @@ struct HomeWidgetPager: View {
             if vm.isWidgetExpanded {
                 // Expanded: Pomodoro and Prayers live under the music player,
                 // so this column is the calendar or the reminders, full height.
-                let page: HomeWidgetPage = state.page == .reminders ? .reminders : .calendar
+                let page: HomeWidgetPage = state.page == .reminders && showReminders ? .reminders : .calendar
                 ZStack {
                     Group {
                         if page == .reminders {
@@ -120,11 +140,14 @@ struct HomeWidgetPager: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
 
-                PageDots(pages: HomeWidgetPage.expandedPages, page: page) { state.go(to: $0) }
+                if HomeWidgetPage.expandedPages.count > 1 {
+                    PageDots(pages: HomeWidgetPage.expandedPages, page: page) { state.go(to: $0) }
+                }
             } else {
+                let page = HomeWidgetPage.enabled.contains(state.page) ? state.page : .calendar
                 ZStack {
-                    pageContent(state.page)
-                        .id(state.page)
+                    pageContent(page)
+                        .id(page)
                         .transition(.asymmetric(
                             insertion: .move(edge: state.forward ? .trailing : .leading).combined(with: .opacity),
                             removal: .move(edge: state.forward ? .leading : .trailing).combined(with: .opacity)
@@ -133,7 +156,9 @@ struct HomeWidgetPager: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
 
-                PageDots(pages: HomeWidgetPage.allCases, page: state.page) { state.go(to: $0) }
+                if HomeWidgetPage.enabled.count > 1 {
+                    PageDots(pages: HomeWidgetPage.enabled, page: page) { state.go(to: $0) }
+                }
             }
         }
         .contentShape(Rectangle())
@@ -170,7 +195,7 @@ struct HomeWidgetPager: View {
         let swipe = swipe
         monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
             guard isHovering else { return event }
-            let pages = vm.isWidgetExpanded ? HomeWidgetPage.expandedPages : HomeWidgetPage.allCases
+            let pages = vm.isWidgetExpanded ? HomeWidgetPage.expandedPages : HomeWidgetPage.enabled
 
             let now = Date()
             // A new trackpad gesture, or a mouse wheel after a pause, starts fresh.
@@ -236,10 +261,13 @@ private struct PageDots: View {
 
 /// What fills the space under the music player when the notch is pulled down.
 struct ExpandedWidgetCards: View {
+    @Default(.showPrayersWidget) private var showPrayers
+    @Default(.showPomodoroWidget) private var showPomodoro
+
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            PomodoroCardView()
-            PrayerCardView()
+            if showPomodoro { PomodoroCardView() }
+            if showPrayers { PrayerCardView() }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -324,7 +352,7 @@ extension BoringViewModel {
     }
 
     func setWidgetExpanded(_ expanded: Bool) {
-        guard notchState == .open else { return }
+        guard notchState == .open, !expanded || HomeWidgetPage.canExpand else { return }
         let changed = expanded != isWidgetExpanded
         widgetWindowTall = true
         withAnimation(Self.widgetSpring) {

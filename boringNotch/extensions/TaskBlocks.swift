@@ -18,6 +18,7 @@
 //    and FlowLocal's /api/x/items/{id}/blocks/done does the arithmetic server-side.
 //
 
+import Defaults
 import Foundation
 import Security
 
@@ -126,13 +127,74 @@ enum LocalStamp {
 
 // MARK: - Credentials
 
+/// The FlowSavvy API key, pasted once in Settings.
+///
+/// Kept in a file in the app's own sandbox container (readable only by this app
+/// and the user), not the Keychain: a self-signed app's Keychain items are bound to
+/// the exact build, so every rebuild asked again for access. A key saved by an older
+/// build in the Keychain is moved over the first time it's needed.
 enum FlowSavvyKeychain {
     private static let service = "boringnotch.flowsavvy"
     private static let account = "api-key"
 
+    private static var file: URL? {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first?
+            .appendingPathComponent("flowsavvy", isDirectory: true)
+            .appendingPathComponent("api-key")
+    }
+
     static func read() -> String? {
-        // The UI sandbox (NoorLab) never touches the Keychain: no access prompts.
+        // The UI sandbox (NoorLab) never touches the key.
         guard !NoorLab.isRequested else { return nil }
+        if let file, let text = try? String(contentsOf: file, encoding: .utf8) {
+            let key = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return key.isEmpty ? nil : key
+        }
+        guard let legacy = readKeychain() else { return nil }
+        if writeFile(legacy) { deleteKeychain() }
+        return legacy
+    }
+
+    /// Whether a key has been saved, without reading it (never prompts).
+    static var exists: Bool {
+        guard !NoorLab.isRequested else { return false }
+        if let file, FileManager.default.fileExists(atPath: file.path) { return true }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: account,
+            kSecReturnAttributes as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
+
+    @discardableResult
+    static func save(_ key: String) -> Bool {
+        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, writeFile(trimmed) else { return false }
+        deleteKeychain()
+        return true
+    }
+
+    static func delete() {
+        if let file { try? FileManager.default.removeItem(at: file) }
+        deleteKeychain()
+    }
+
+    private static func writeFile(_ key: String) -> Bool {
+        guard let file else { return false }
+        do {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data(key.utf8).write(to: file, options: [.atomic])
+            try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: file.path)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private static func readKeychain() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -149,22 +211,7 @@ enum FlowSavvyKeychain {
         return key
     }
 
-    @discardableResult
-    static func save(_ key: String) -> Bool {
-        delete()
-        let trimmed = key.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let data = trimmed.data(using: .utf8) else { return false }
-        let attributes: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
-        ]
-        return SecItemAdd(attributes as CFDictionary, nil) == errSecSuccess
-    }
-
-    static func delete() {
+    private static func deleteKeychain() {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -450,5 +497,25 @@ final class TaskBlockCompleter: ObservableObject {
     func isPending(_ event: EventModel) -> Bool { pending.contains(event.taskBlockKey) }
     func failureMessage(for event: EventModel) -> String? {
         failure?.eventID == event.taskBlockKey ? failure?.message : nil
+    }
+}
+
+// MARK: - Turning the integration on
+
+enum TaskBlockIntegration {
+    /// Once, at first launch with this feature: switch the integration on if this
+    /// Mac already has a FlowSavvy key or a FlowLocal install, so existing users keep
+    /// their checkboxes and everyone else gets a plain calendar.
+    @MainActor
+    static func autoEnableIfConfigured() {
+        guard !Defaults[.taskBlockAutoDetected] else { return }
+        // Existence checks only: nothing here reads a secret, so nothing can prompt.
+        let flowSavvy = FlowSavvyKeychain.exists
+        let flowLocal = FileManager.default.isReadableFile(atPath: FlowLocalKey.path)
+        Defaults[.taskBlockAutoDetected] = true
+        if flowSavvy || flowLocal {
+            Defaults[.taskBlockCheckboxes] = true
+        }
+        NSLog("Task-block integration auto-detect: FlowSavvy key \(flowSavvy), FlowLocal \(flowLocal) -> \(Defaults[.taskBlockCheckboxes] ? "on" : "off")")
     }
 }
